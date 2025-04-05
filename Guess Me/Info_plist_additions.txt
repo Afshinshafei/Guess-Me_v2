@@ -1,0 +1,43 @@
+## Info.plist Additions for AdMob and Permissions
+
+Add the following keys to your Info.plist file:
+
+1. AdMob App ID:
+```
+<key>GADApplicationIdentifier</key>
+<string>ca-app-pub-3940256099942544~1458002511</string>
+```
+
+2. SKAdNetworkItems for AdMob:
+```
+<key>SKAdNetworkItems</key>
+<array>
+  <dict>
+    <key>SKAdNetworkIdentifier</key>
+    <string>cstr6suwn9.skadnetwork</string>
+  </dict>
+</array>
+```
+
+3. App Transport Security settings (for ads):
+```
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+</dict>
+```
+
+4. Privacy permissions for photo library access:
+```
+<key>NSPhotoLibraryUsageDescription</key>
+<string>We need access to your photo library to upload your profile picture.</string>
+```
+
+5. User tracking permission (for personalized ads):
+```
+<key>NSUserTrackingUsageDescription</key>
+<string>This identifier will be used to deliver personalized ads to you.</string>
+```
+
+Remember to replace the test AdMob App ID with your actual ID for production. 

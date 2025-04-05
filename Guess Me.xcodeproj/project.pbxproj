@@ -6,6 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F155B6562D9FD377008C2C13 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = F155B6552D9FD377008C2C13 /* FirebaseAnalytics */; };
+		F155B6582D9FD377008C2C13 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = F155B6572D9FD377008C2C13 /* FirebaseAuth */; };
+		F155B65A2D9FD377008C2C13 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = F155B6592D9FD377008C2C13 /* FirebaseFirestore */; };
+		F155B65C2D9FD377008C2C13 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = F155B65B2D9FD377008C2C13 /* FirebaseStorage */; };
+		F155B65F2D9FD433008C2C13 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = F155B65E2D9FD433008C2C13 /* GoogleMobileAds */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		F155B60B2D9FCE61008C2C13 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +60,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F155B6562D9FD377008C2C13 /* FirebaseAnalytics in Frameworks */,
+				F155B65C2D9FD377008C2C13 /* FirebaseStorage in Frameworks */,
+				F155B65F2D9FD433008C2C13 /* GoogleMobileAds in Frameworks */,
+				F155B6582D9FD377008C2C13 /* FirebaseAuth in Frameworks */,
+				F155B65A2D9FD377008C2C13 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +125,11 @@
 			);
 			name = "Guess Me";
 			packageProductDependencies = (
+				F155B6552D9FD377008C2C13 /* FirebaseAnalytics */,
+				F155B6572D9FD377008C2C13 /* FirebaseAuth */,
+				F155B6592D9FD377008C2C13 /* FirebaseFirestore */,
+				F155B65B2D9FD377008C2C13 /* FirebaseStorage */,
+				F155B65E2D9FD433008C2C13 /* GoogleMobileAds */,
 			);
 			productName = "Guess Me";
 			productReference = F155B5FA2D9FCE5F008C2C13 /* Guess Me.app */;
@@ -195,6 +213,10 @@
 			);
 			mainGroup = F155B5F12D9FCE5F008C2C13;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F155B6542D9FD377008C2C13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				F155B65D2D9FD433008C2C13 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F155B5FB2D9FCE5F008C2C13 /* Products */;
 			projectDirPath = "";
@@ -399,6 +421,9 @@
 				DEVELOPMENT_TEAM = M527TJPWF3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Guess-Me-Info.plist";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photo library to upload your profile picture.";
+				INFOPLIST_KEY_NSUserTrackingUsageDescription = "This identifier will be used to deliver personalized ads to you.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,6 +453,9 @@
 				DEVELOPMENT_TEAM = M527TJPWF3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Guess-Me-Info.plist";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photo library to upload your profile picture.";
+				INFOPLIST_KEY_NSUserTrackingUsageDescription = "This identifier will be used to deliver personalized ads to you.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -558,6 +586,53 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F155B6542D9FD377008C2C13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.11.0;
+			};
+		};
+		F155B65D2D9FD433008C2C13 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F155B6552D9FD377008C2C13 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F155B6542D9FD377008C2C13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		F155B6572D9FD377008C2C13 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F155B6542D9FD377008C2C13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		F155B6592D9FD377008C2C13 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F155B6542D9FD377008C2C13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		F155B65B2D9FD377008C2C13 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F155B6542D9FD377008C2C13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		F155B65E2D9FD433008C2C13 /* GoogleMobileAds */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F155B65D2D9FD433008C2C13 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
+			productName = GoogleMobileAds;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F155B5F22D9FCE5F008C2C13 /* Project object */;
 }
