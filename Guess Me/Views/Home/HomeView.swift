@@ -8,6 +8,7 @@ struct HomeView: View {
     @State private var showWatchAdAlert = false
     @State private var showAdRewardController = false
     @State private var animateBackground = false
+    @State private var showAllAchievements = false
     
     var body: some View {
         NavigationView {
@@ -38,6 +39,9 @@ struct HomeView: View {
                             
                             // Stats section
                             statsSection
+                            
+                            // Awards section
+                            awardsSection
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 15)
@@ -56,6 +60,9 @@ struct HomeView: View {
                 .navigationBarTitleDisplayMode(.large)
                 .sheet(isPresented: $showAdRewardController) {
                     loadingAdView
+                }
+                .sheet(isPresented: $showAllAchievements) {
+                    AchievementsView()
                 }
                 .alert(isPresented: $showWatchAdAlert) {
                     Alert(
@@ -235,6 +242,69 @@ struct HomeView: View {
                 .fill(AppTheme.cardBackground)
         )
         .floatingCardStyle()
+    }
+    
+    private var awardsSection: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            // Header with title and "See All" button
+            HStack {
+                Text("Awards")
+                    .font(AppTheme.subheading())
+                    .foregroundColor(AppTheme.textPrimary)
+                
+                Spacer()
+                
+                Button(action: {
+                    showAllAchievements = true
+                }) {
+                    Text("See All")
+                        .font(AppTheme.caption())
+                        .foregroundColor(AppTheme.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(AppTheme.primary.opacity(0.1))
+                        )
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+            
+            // Awards grid
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 15) {
+                ForEach(Achievement.allAchievements.prefix(6), id: \.id) { achievement in
+                    AwardBadgeView(
+                        achievement: achievement,
+                        isEarned: authService.user?.achievements.contains(achievement.id) ?? false,
+                        progress: calculateProgress(for: achievement)
+                    )
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(AppTheme.cardBackground)
+        )
+        .floatingCardStyle()
+    }
+    
+    private func calculateProgress(for achievement: Achievement) -> Double {
+        guard let user = authService.user else { return 0 }
+        
+        switch achievement.type {
+        case .correctGuesses:
+            return min(1.0, Double(user.correctGuesses) / Double(achievement.requirement))
+        case .streak:
+            let current = max(user.highestStreak, user.streak)
+            return min(1.0, Double(current) / Double(achievement.requirement))
+        case .totalGuesses:
+            return min(1.0, Double(user.totalGuesses) / Double(achievement.requirement))
+        }
     }
 }
 

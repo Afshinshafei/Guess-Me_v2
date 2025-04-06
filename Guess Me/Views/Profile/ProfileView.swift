@@ -176,6 +176,15 @@ struct ProfileView: View {
     @State private var isShowingAchievements = false
     @State private var animateBackground = false
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showAllAchievements = false
+    
+    private var earnedCount: Int {
+        authService.user?.achievements.count ?? 0
+    }
+    
+    private var totalCount: Int {
+        Achievement.allAchievements.count
+    }
     
     var body: some View {
         NavigationView {
@@ -451,7 +460,7 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 15) {
             // Header row
             HStack {
-                Text("Achievements")
+                Text("Awards")
                     .font(AppTheme.subheading())
                     .foregroundColor(AppTheme.textPrimary)
                 
@@ -473,10 +482,65 @@ struct ProfileView: View {
                 .buttonStyle(ScaleButtonStyle())
             }
             
-            // Achievement items
-            ScrollView(.horizontal, showsIndicators: false) {
-                achievementItems
+            // Awards summary
+            HStack(spacing: 20) {
+                // Progress circle
+                ZStack {
+                    Circle()
+                        .stroke(AppTheme.textSecondary.opacity(0.2), lineWidth: 10)
+                        .frame(width: 80, height: 80)
+                    
+                    Circle()
+                        .trim(from: 0, to: earnedCount == 0 ? 0.001 : CGFloat(earnedCount) / CGFloat(totalCount))
+                        .stroke(
+                            LinearGradient(
+                                colors: [AppTheme.primary, AppTheme.secondary],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                        )
+                        .frame(width: 80, height: 80)
+                        .rotationEffect(.degrees(-90))
+                    
+                    VStack(spacing: 2) {
+                        Text("\(earnedCount)")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(AppTheme.primary)
+                        
+                        Text("of \(totalCount)")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Awards Earned")
+                        .font(AppTheme.body())
+                        .foregroundColor(AppTheme.textPrimary)
+                    
+                    Text("Complete challenges to earn more awards")
+                        .font(AppTheme.caption())
+                        .foregroundColor(AppTheme.textSecondary)
+                        .lineLimit(2)
+                    
+                    Button(action: {
+                        isShowingAchievements = true
+                    }) {
+                        Text("View All Awards")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.primary)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(AppTheme.primary.opacity(0.1))
+                            )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
             }
+            .padding(.vertical, 10)
         }
         .padding(20)
         .background(

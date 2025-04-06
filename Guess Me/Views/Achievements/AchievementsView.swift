@@ -1,9 +1,18 @@
 import SwiftUI
 
 struct AchievementsView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthenticationService
-    @State private var showAll = false
+    @State private var showAllAwards = true
     @State private var animateBackground = false
+    
+    private var earnedCount: Int {
+        authService.user?.achievements.count ?? 0
+    }
+    
+    private var totalCount: Int {
+        Achievement.allAchievements.count
+    }
     
     var body: some View {
         NavigationView {
@@ -27,266 +36,162 @@ struct AchievementsView: View {
                 }
                 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 25) {
-                        achievementsSummary
+                    VStack(spacing: 25) {
+                        // Summary section
+                        summarySection
                         
-                        Divider()
-                            .background(AppTheme.textSecondary.opacity(0.2))
-                            .padding(.horizontal)
+                        // Filter toggle
+                        filterToggle
                         
-                        achievementsList
+                        // Awards grid
+                        awardsGrid
                     }
+                    .padding(.horizontal, 20)
                     .padding(.vertical, 15)
                 }
-                .navigationTitle("Achievements")
-                .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(showAll ? "Show Earned" : "Show All") {
-                            withAnimation(.bouncy) {
-                                showAll.toggle()
-                            }
-                        }
-                        .foregroundColor(AppTheme.primary)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
-                        .background(
-                            Capsule()
-                                .fill(AppTheme.primary.opacity(0.1))
-                        )
-                        .buttonStyle(ScaleButtonStyle())
+            }
+            .navigationTitle("Awards")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(AppTheme.textSecondary)
+                            .font(.title2)
                     }
                 }
             }
         }
     }
     
-    private var achievementsSummary: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("Your Progress")
-                .font(AppTheme.subheading())
+    private var summarySection: some View {
+        VStack(spacing: 15) {
+            Text("Your Awards")
+                .font(AppTheme.heading())
                 .foregroundColor(AppTheme.textPrimary)
-                .padding(.bottom, 5)
             
-            let earnedCount = authService.user?.achievements.count ?? 0
-            let totalCount = Achievement.allAchievements.count
-            
-            HStack {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("\(earnedCount) of \(totalCount)")
-                        .font(AppTheme.heading())
-                        .foregroundColor(AppTheme.textPrimary)
-                    
-                    Text("Achievements Earned")
-                        .font(AppTheme.body())
-                        .foregroundColor(AppTheme.textSecondary)
-                }
-                
-                Spacer()
-                
+            HStack(spacing: 20) {
+                // Progress circle
                 ZStack {
                     Circle()
-                        .stroke(AppTheme.textSecondary.opacity(0.2), lineWidth: 10)
+                        .stroke(AppTheme.cardBackground, lineWidth: 8)
                         .frame(width: 80, height: 80)
                     
                     Circle()
-                        .trim(from: 0, to: earnedCount == 0 ? 0.001 : CGFloat(earnedCount) / CGFloat(totalCount))
-                        .stroke(
-                            LinearGradient(
-                                colors: [AppTheme.primary, AppTheme.secondary],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                        )
+                        .trim(from: 0, to: CGFloat(earnedCount) / CGFloat(totalCount))
+                        .stroke(AppTheme.primary, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                         .frame(width: 80, height: 80)
                         .rotationEffect(.degrees(-90))
                     
-                    Text("\(Int(Double(earnedCount) / Double(totalCount) * 100))%")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundColor(AppTheme.primary)
-                }
-            }
-            
-            if earnedCount == 0 {
-                Text("Start playing to earn achievements!")
-                    .font(AppTheme.caption())
-                    .foregroundColor(AppTheme.textSecondary)
-                    .padding(.top, 5)
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(AppTheme.cardBackground)
-        )
-        .floatingCardStyle()
-        .padding(.horizontal, 15)
-    }
-    
-    private var achievementsList: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text(showAll ? "All Achievements" : "Your Achievements")
-                .font(AppTheme.subheading())
-                .foregroundColor(AppTheme.textPrimary)
-                .padding(.horizontal, 15)
-                .padding(.bottom, 5)
-            
-            if showAll {
-                // Show all achievements
-                ForEach(Achievement.allAchievements, id: \.id) { achievement in
-                    achievementRow(achievement)
-                        .transition(.opacity)
-                }
-            } else {
-                // Show only earned achievements
-                if let userAchievements = authService.user?.achievements, !userAchievements.isEmpty {
-                    ForEach(userAchievements, id: \.self) { achievementId in
-                        if let achievement = Achievement.allAchievements.first(where: { $0.id == achievementId }) {
-                            achievementRow(achievement, earned: true)
-                                .transition(.opacity)
-                        }
-                    }
-                } else {
-                    emptyAchievementsView
-                }
-            }
-        }
-    }
-    
-    private var emptyAchievementsView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "trophy")
-                .font(.system(size: 60))
-                .foregroundColor(AppTheme.textSecondary.opacity(0.3))
-                .padding(.top, 20)
-            
-            Text("You haven't earned any achievements yet")
-                .font(AppTheme.body())
-                .foregroundColor(AppTheme.textPrimary)
-                .multilineTextAlignment(.center)
-            
-            Text("Start playing to earn some!")
-                .font(AppTheme.caption())
-                .foregroundColor(AppTheme.textSecondary)
-                .padding(.bottom, 20)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(AppTheme.cardBackground)
-        )
-        .floatingCardStyle()
-        .padding(.horizontal, 15)
-    }
-    
-    private func achievementRow(_ achievement: Achievement, earned: Bool = false) -> some View {
-        let isEarned = authService.user?.achievements.contains(achievement.id) ?? false
-        let gradientColor = AppTheme.primary.opacity(0.7)
-        
-        return HStack(spacing: 15) {
-            // Achievement icon
-            ZStack {
-                Circle()
-                    .fill(isEarned ? gradientColor : AppTheme.textSecondary.opacity(0.1))
-                    .frame(width: 50, height: 50)
-                
-                Image(systemName: achievement.imageName)
-                    .font(.system(size: 22))
-                    .foregroundColor(isEarned ? AppTheme.textOnDark : AppTheme.textSecondary)
-            }
-            .shadow(color: isEarned ? AppTheme.primary.opacity(0.3) : Color.clear, radius: 5)
-            
-            // Achievement details
-            VStack(alignment: .leading, spacing: 4) {
-                Text(achievement.name)
-                    .font(AppTheme.body())
-                    .foregroundColor(isEarned ? AppTheme.textPrimary : AppTheme.textSecondary)
-                
-                Text(achievement.description)
-                    .font(AppTheme.caption())
-                    .foregroundColor(AppTheme.textSecondary)
-                
-                if !isEarned && showAll {
-                    HStack {
-                        Text(progressText(for: achievement))
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundColor(AppTheme.primary)
+                    VStack(spacing: 2) {
+                        Text("\(earnedCount)")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(AppTheme.textPrimary)
                         
-                        // Progress bar
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(AppTheme.textSecondary.opacity(0.2))
-                                    .frame(height: 4)
-                                
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [AppTheme.primary, AppTheme.secondary],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: progressWidth(for: achievement, totalWidth: geometry.size.width), height: 4)
-                            }
-                        }
-                        .frame(height: 4)
-                        .padding(.top, 4)
+                        Text("of \(totalCount)")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(AppTheme.textSecondary)
                     }
                 }
-            }
-            
-            Spacer()
-            
-            // Checkmark for earned achievements
-            if isEarned {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(AppTheme.correct)
-                    .font(.system(size: 22))
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Keep playing to earn more awards!")
+                        .font(AppTheme.body())
+                        .foregroundColor(AppTheme.textPrimary)
+                    
+                    Text("Awards are earned by reaching specific milestones in your gameplay.")
+                        .font(AppTheme.caption())
+                        .foregroundColor(AppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
-        .padding(15)
+        .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(AppTheme.cardBackground)
-                .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
         )
-        .padding(.horizontal, 15)
-        .opacity(isEarned ? 1.0 : 0.8)
+        .floatingCardStyle()
     }
     
-    private func progressText(for achievement: Achievement) -> String {
-        guard let user = authService.user else { return "" }
-        
-        switch achievement.type {
-        case .correctGuesses:
-            return "\(user.correctGuesses)/\(achievement.requirement)"
-        case .streak:
-            let current = max(user.highestStreak, user.streak)
-            return "\(current)/\(achievement.requirement)"
-        case .totalGuesses:
-            return "\(user.totalGuesses)/\(achievement.requirement)"
+    private var filterToggle: some View {
+        HStack {
+            Button(action: {
+                withAnimation {
+                    showAllAwards = true
+                }
+            }) {
+                Text("All Awards")
+                    .font(AppTheme.body())
+                    .foregroundColor(showAllAwards ? AppTheme.textPrimary : AppTheme.textSecondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(showAllAwards ? AppTheme.primary.opacity(0.1) : AppTheme.cardBackground)
+                    )
+            }
+            
+            Button(action: {
+                withAnimation {
+                    showAllAwards = false
+                }
+            }) {
+                Text("Your Awards")
+                    .font(AppTheme.body())
+                    .foregroundColor(!showAllAwards ? AppTheme.textPrimary : AppTheme.textSecondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(!showAllAwards ? AppTheme.primary.opacity(0.1) : AppTheme.cardBackground)
+                    )
+            }
         }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(AppTheme.cardBackground)
+        )
+        .floatingCardStyle()
     }
     
-    private func progressWidth(for achievement: Achievement, totalWidth: CGFloat) -> CGFloat {
+    private var awardsGrid: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: 15) {
+            ForEach(showAllAwards ? Achievement.allAchievements : Achievement.allAchievements.filter { authService.user?.achievements.contains($0.id) ?? false }, id: \.id) { achievement in
+                AwardBadgeView(
+                    achievement: achievement,
+                    isEarned: authService.user?.achievements.contains(achievement.id) ?? false,
+                    progress: calculateProgress(for: achievement)
+                )
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(AppTheme.cardBackground)
+        )
+        .floatingCardStyle()
+    }
+    
+    private func calculateProgress(for achievement: Achievement) -> Double {
         guard let user = authService.user else { return 0 }
         
-        var progress: Double = 0
-        
         switch achievement.type {
         case .correctGuesses:
-            progress = min(1.0, Double(user.correctGuesses) / Double(achievement.requirement))
+            return min(1.0, Double(user.correctGuesses) / Double(achievement.requirement))
         case .streak:
             let current = max(user.highestStreak, user.streak)
-            progress = min(1.0, Double(current) / Double(achievement.requirement))
+            return min(1.0, Double(current) / Double(achievement.requirement))
         case .totalGuesses:
-            progress = min(1.0, Double(user.totalGuesses) / Double(achievement.requirement))
+            return min(1.0, Double(user.totalGuesses) / Double(achievement.requirement))
         }
-        
-        return CGFloat(progress) * totalWidth
     }
 }
 
