@@ -34,7 +34,6 @@ GuessMe is a fun and engaging iOS app where users try to guess things about othe
    - Select the following products:
      - FirebaseAuth
      - FirebaseFirestore
-     - FirebaseFirestoreSwift
      - FirebaseStorage
      - FirebaseAnalytics (optional but recommended)
 

@@ -2,14 +2,21 @@ import SwiftUI
 import PhotosUI
 import Combine
 
-class ProfileSetupViewModel: ObservableObject {
+@MainActor
+final class ProfileSetupViewModel: ObservableObject, Sendable {
     @Published var username = ""
     @Published var age: String = ""
     @Published var occupation = ""
-    @Published var education = ""
-    @Published var height: String = ""
-    @Published var weight: String = ""
+    @Published var selectedEducationIndex = 0
+    @Published var selectedHeightIndex = 0
+    @Published var selectedWeightIndex = 0
     @Published var smoker = false
+    @Published var favoriteColor = ""
+    @Published var favoriteMovie = ""
+    @Published var favoriteFood = ""
+    @Published var favoriteFlower = ""
+    @Published var favoriteSport = ""
+    @Published var favoriteHobby = ""
     @Published var selectedPhotoItem: PhotosPickerItem?
     @Published var selectedImage: UIImage?
     @Published var isLoading = false
@@ -18,6 +25,34 @@ class ProfileSetupViewModel: ObservableObject {
     @Published var setupComplete = false
     @Published var errorMessage: String?
     @Published var showError = false
+    
+    // Picker options
+    let educationLevels = [
+        "High School",
+        "Some College",
+        "Associate's Degree",
+        "Bachelor's Degree",
+        "Master's Degree",
+        "Doctorate",
+        "Trade School",
+        "Other"
+    ]
+    
+    let heightOptions: [Int] = {
+        var heights: [Int] = []
+        for height in 140...220 {
+            heights.append(height)
+        }
+        return heights
+    }()
+    
+    let weightOptions: [Int] = {
+        var weights: [Int] = []
+        for weight in 40...150 {
+            weights.append(weight)
+        }
+        return weights
+    }()
     
     var authService: AuthenticationService
     private var cancellables = Set<AnyCancellable>()
@@ -30,19 +65,36 @@ class ProfileSetupViewModel: ObservableObject {
     func loadUserDataFromService() {
         if let user = authService.user {
             username = user.username
-            // Load other data if available
             if let age = user.age {
                 self.age = "\(age)"
             }
             occupation = user.occupation ?? ""
-            education = user.education ?? ""
-            if let height = user.height {
-                self.height = "\(Int(height))"
+            
+            // Set education index
+            if let education = user.education,
+               let index = educationLevels.firstIndex(of: education) {
+                selectedEducationIndex = index
             }
-            if let weight = user.weight {
-                self.weight = "\(Int(weight))"
+            
+            // Set height index
+            if let height = user.height,
+               let index = heightOptions.firstIndex(of: Int(height)) {
+                selectedHeightIndex = index
             }
+            
+            // Set weight index
+            if let weight = user.weight,
+               let index = weightOptions.firstIndex(of: Int(weight)) {
+                selectedWeightIndex = index
+            }
+            
             smoker = user.smoker ?? false
+            favoriteColor = user.favoriteColor ?? ""
+            favoriteMovie = user.favoriteMovie ?? ""
+            favoriteFood = user.favoriteFood ?? ""
+            favoriteFlower = user.favoriteFlower ?? ""
+            favoriteSport = user.favoriteSport ?? ""
+            favoriteHobby = user.favoriteHobby ?? ""
         }
     }
     
@@ -64,12 +116,11 @@ class ProfileSetupViewModel: ObservableObject {
         case 0: // Basic info
             return !username.isEmpty && !age.isEmpty && Int(age) != nil
         case 1: // Details
-            return !height.isEmpty && !weight.isEmpty && 
-                   Double(height) != nil && Double(weight) != nil
+            return true // No need to validate height and weight as they're always valid with pickers
         case 2: // Photo
             return selectedImage != nil
         case 3: // Review
-            return true // Review step is always valid
+            return true
         default:
             return false
         }
@@ -84,7 +135,15 @@ class ProfileSetupViewModel: ObservableObject {
         if currentStep < 3 {
             currentStep += 1
         } else {
-            saveProfile()
+            Task {
+                do {
+                    try await saveProfile()
+                } catch {
+                    print("Error saving profile: \(error)")
+                    errorMessage = "Failed to save profile: \(error.localizedDescription)"
+                    showError = true
+                }
+            }
         }
     }
     
@@ -106,12 +165,7 @@ class ProfileSetupViewModel: ObservableObject {
                 message += "\n- Valid age"
             }
         case 1:
-            if height.isEmpty || Double(height) == nil {
-                message += "\n- Valid height"
-            }
-            if weight.isEmpty || Double(weight) == nil {
-                message += "\n- Valid weight"
-            }
+            message = "Please select valid height and weight"
         case 2:
             message = "Please select a profile photo"
         default:
@@ -122,7 +176,7 @@ class ProfileSetupViewModel: ObservableObject {
         showError = true
     }
     
-    func saveProfile() {
+    private func saveProfile() async throws {
         guard var user = authService.user else { 
             errorMessage = "Error: No user available to save profile"
             showError = true
@@ -137,10 +191,16 @@ class ProfileSetupViewModel: ObservableObject {
         user.username = username
         user.age = Int(age)
         user.occupation = occupation.isEmpty ? nil : occupation
-        user.education = education.isEmpty ? nil : education
-        user.height = Double(height)
-        user.weight = Double(weight)
+        user.education = educationLevels[selectedEducationIndex]
+        user.height = Double(heightOptions[selectedHeightIndex])
+        user.weight = Double(weightOptions[selectedWeightIndex])
         user.smoker = smoker
+        user.favoriteColor = favoriteColor.isEmpty ? nil : favoriteColor
+        user.favoriteMovie = favoriteMovie.isEmpty ? nil : favoriteMovie
+        user.favoriteFood = favoriteFood.isEmpty ? nil : favoriteFood
+        user.favoriteFlower = favoriteFlower.isEmpty ? nil : favoriteFlower
+        user.favoriteSport = favoriteSport.isEmpty ? nil : favoriteSport
+        user.favoriteHobby = favoriteHobby.isEmpty ? nil : favoriteHobby
         
         // Ensure hasCompletedSetup is set to true
         user.hasCompletedSetup = true
@@ -465,60 +525,254 @@ struct ProfileSetupView: View {
                 .foregroundColor(AppTheme.textPrimary)
                 .padding(.bottom, 5)
             
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Occupation")
-                    .font(AppTheme.caption())
-                    .foregroundColor(AppTheme.textSecondary)
-                
-                TextField("Occupation", text: $viewModel.occupation)
-                    .textFieldStyle(icon: "briefcase.fill", iconColor: AppTheme.tertiary)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Basic Details Section
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Occupation")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        TextField("Occupation", text: $viewModel.occupation)
+                            .textFieldStyle(icon: "briefcase.fill", iconColor: AppTheme.tertiary)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Education")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        Menu {
+                            ForEach(0..<viewModel.educationLevels.count, id: \.self) { index in
+                                Button(action: {
+                                    withAnimation(.springy) {
+                                        viewModel.selectedEducationIndex = index
+                                    }
+                                }) {
+                                    HStack {
+                                        Text(viewModel.educationLevels[index])
+                                            .foregroundColor(AppTheme.textPrimary)
+                                        
+                                        if index == viewModel.selectedEducationIndex {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(AppTheme.tertiary)
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "book.fill")
+                                    .foregroundColor(AppTheme.tertiary)
+                                
+                                Text(viewModel.educationLevels[viewModel.selectedEducationIndex])
+                                    .foregroundColor(AppTheme.textPrimary)
+                                    .font(AppTheme.body())
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.down")
+                                    .foregroundColor(AppTheme.tertiary)
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(AppTheme.cardBackground)
+                                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(AppTheme.tertiary.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Height (cm)")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        Menu {
+                            ForEach(0..<viewModel.heightOptions.count, id: \.self) { index in
+                                Button(action: {
+                                    withAnimation(.springy) {
+                                        viewModel.selectedHeightIndex = index
+                                    }
+                                }) {
+                                    HStack {
+                                        Text("\(viewModel.heightOptions[index]) cm")
+                                            .foregroundColor(AppTheme.textPrimary)
+                                        
+                                        if index == viewModel.selectedHeightIndex {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(AppTheme.tertiary)
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "ruler")
+                                    .foregroundColor(AppTheme.tertiary)
+                                
+                                Text("\(viewModel.heightOptions[viewModel.selectedHeightIndex]) cm")
+                                    .foregroundColor(AppTheme.textPrimary)
+                                    .font(AppTheme.body())
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.down")
+                                    .foregroundColor(AppTheme.tertiary)
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(AppTheme.cardBackground)
+                                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(AppTheme.tertiary.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Weight (kg)")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        Menu {
+                            ForEach(0..<viewModel.weightOptions.count, id: \.self) { index in
+                                Button(action: {
+                                    withAnimation(.springy) {
+                                        viewModel.selectedWeightIndex = index
+                                    }
+                                }) {
+                                    HStack {
+                                        Text("\(viewModel.weightOptions[index]) kg")
+                                            .foregroundColor(AppTheme.textPrimary)
+                                        
+                                        if index == viewModel.selectedWeightIndex {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(AppTheme.tertiary)
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "scalemass")
+                                    .foregroundColor(AppTheme.tertiary)
+                                
+                                Text("\(viewModel.weightOptions[viewModel.selectedWeightIndex]) kg")
+                                    .foregroundColor(AppTheme.textPrimary)
+                                    .font(AppTheme.body())
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.down")
+                                    .foregroundColor(AppTheme.tertiary)
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(AppTheme.cardBackground)
+                                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(AppTheme.tertiary.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                    }
+                    
+                    HStack {
+                        Text("Smoker")
+                            .font(AppTheme.body())
+                            .foregroundColor(AppTheme.textPrimary)
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $viewModel.smoker)
+                            .toggleStyle(SwitchToggleStyle(tint: AppTheme.tertiary))
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppTheme.cardBackground)
+                            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppTheme.tertiary.opacity(0.3), lineWidth: 1)
+                    )
+                    
+                    // Preferences Section
+                    Text("Your Preferences")
+                        .font(AppTheme.subheading())
+                        .foregroundColor(AppTheme.textPrimary)
+                        .padding(.top, 10)
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Favorite Color")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        TextField("Favorite Color", text: $viewModel.favoriteColor)
+                            .textFieldStyle(icon: "paintpalette.fill", iconColor: Color.purple)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Favorite Movie")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        TextField("Favorite Movie", text: $viewModel.favoriteMovie)
+                            .textFieldStyle(icon: "film.fill", iconColor: Color.indigo)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Favorite Food")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        TextField("Favorite Food", text: $viewModel.favoriteFood)
+                            .textFieldStyle(icon: "fork.knife", iconColor: Color.orange)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Favorite Flower")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        TextField("Favorite Flower", text: $viewModel.favoriteFlower)
+                            .textFieldStyle(icon: "leaf.fill", iconColor: Color.pink)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Favorite Sport")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        TextField("Favorite Sport", text: $viewModel.favoriteSport)
+                            .textFieldStyle(icon: "sportscourt.fill", iconColor: Color.green)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Favorite Hobby")
+                            .font(AppTheme.caption())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        TextField("Favorite Hobby", text: $viewModel.favoriteHobby)
+                            .textFieldStyle(icon: "heart.fill", iconColor: Color.red)
+                    }
+                }
+                .padding(.bottom, 20)
             }
-            
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Education")
-                    .font(AppTheme.caption())
-                    .foregroundColor(AppTheme.textSecondary)
-                
-                TextField("Education", text: $viewModel.education)
-                    .textFieldStyle(icon: "book.fill", iconColor: AppTheme.tertiary)
-            }
-            
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Height (cm)")
-                    .font(AppTheme.caption())
-                    .foregroundColor(AppTheme.textSecondary)
-                
-                TextField("Height", text: $viewModel.height)
-                    .textFieldStyle(icon: "ruler", iconColor: AppTheme.tertiary)
-                    .keyboardType(.numberPad)
-            }
-            
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Weight (kg)")
-                    .font(AppTheme.caption())
-                    .foregroundColor(AppTheme.textSecondary)
-                
-                TextField("Weight", text: $viewModel.weight)
-                    .textFieldStyle(icon: "scalemass", iconColor: AppTheme.tertiary)
-                    .keyboardType(.numberPad)
-            }
-            
-            HStack {
-                Text("Smoker")
-                    .font(AppTheme.body())
-                    .foregroundColor(AppTheme.textPrimary)
-                
-                Spacer()
-                
-                Toggle("", isOn: $viewModel.smoker)
-                    .toggleStyle(SwitchToggleStyle(tint: AppTheme.tertiary))
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(AppTheme.cardBackground)
-                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-            )
         }
     }
     
@@ -679,11 +933,11 @@ struct ProfileSetupView: View {
                         }
                     }
                     
-                    if !viewModel.education.isEmpty {
+                    if !viewModel.educationLevels[viewModel.selectedEducationIndex].isEmpty {
                         HStack {
                             Image(systemName: "book.fill")
                                 .foregroundColor(AppTheme.tertiary)
-                            Text(viewModel.education)
+                            Text(viewModel.educationLevels[viewModel.selectedEducationIndex])
                                 .font(AppTheme.body())
                                 .foregroundColor(AppTheme.textSecondary)
                         }
@@ -700,21 +954,21 @@ struct ProfileSetupView: View {
             
             // Additional details
             VStack(alignment: .leading, spacing: 15) {
-                if !viewModel.height.isEmpty {
+                if viewModel.selectedHeightIndex < viewModel.heightOptions.count {
                     HStack {
                         Image(systemName: "ruler")
                             .foregroundColor(AppTheme.tertiary)
-                        Text("Height: \(viewModel.height) cm")
+                        Text("Height: \(viewModel.heightOptions[viewModel.selectedHeightIndex]) cm")
                             .font(AppTheme.body())
                             .foregroundColor(AppTheme.textSecondary)
                     }
                 }
                 
-                if !viewModel.weight.isEmpty {
+                if viewModel.selectedWeightIndex < viewModel.weightOptions.count {
                     HStack {
                         Image(systemName: "scalemass")
                             .foregroundColor(AppTheme.tertiary)
-                        Text("Weight: \(viewModel.weight) kg")
+                        Text("Weight: \(viewModel.weightOptions[viewModel.selectedWeightIndex]) kg")
                             .font(AppTheme.body())
                             .foregroundColor(AppTheme.textSecondary)
                     }
@@ -726,6 +980,80 @@ struct ProfileSetupView: View {
                     Text("Smoker: \(viewModel.smoker ? "Yes" : "No")")
                         .font(AppTheme.body())
                         .foregroundColor(AppTheme.textSecondary)
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(AppTheme.cardBackground)
+                    .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 3)
+            )
+            
+            // Preferences section
+            VStack(alignment: .leading, spacing: 15) {
+                Text("Your Preferences")
+                    .font(AppTheme.subheading())
+                    .foregroundColor(AppTheme.textPrimary)
+                    .padding(.bottom, 5)
+                
+                if !viewModel.favoriteColor.isEmpty {
+                    HStack {
+                        Image(systemName: "paintpalette.fill")
+                            .foregroundColor(Color.purple)
+                        Text("Favorite Color: \(viewModel.favoriteColor)")
+                            .font(AppTheme.body())
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                }
+                
+                if !viewModel.favoriteMovie.isEmpty {
+                    HStack {
+                        Image(systemName: "film.fill")
+                            .foregroundColor(Color.indigo)
+                        Text("Favorite Movie: \(viewModel.favoriteMovie)")
+                            .font(AppTheme.body())
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                }
+                
+                if !viewModel.favoriteFood.isEmpty {
+                    HStack {
+                        Image(systemName: "fork.knife")
+                            .foregroundColor(Color.orange)
+                        Text("Favorite Food: \(viewModel.favoriteFood)")
+                            .font(AppTheme.body())
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                }
+                
+                if !viewModel.favoriteFlower.isEmpty {
+                    HStack {
+                        Image(systemName: "leaf.fill")
+                            .foregroundColor(Color.pink)
+                        Text("Favorite Flower: \(viewModel.favoriteFlower)")
+                            .font(AppTheme.body())
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                }
+                
+                if !viewModel.favoriteSport.isEmpty {
+                    HStack {
+                        Image(systemName: "sportscourt.fill")
+                            .foregroundColor(Color.green)
+                        Text("Favorite Sport: \(viewModel.favoriteSport)")
+                            .font(AppTheme.body())
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                }
+                
+                if !viewModel.favoriteHobby.isEmpty {
+                    HStack {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(Color.red)
+                        Text("Favorite Hobby: \(viewModel.favoriteHobby)")
+                            .font(AppTheme.body())
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
                 }
             }
             .padding()

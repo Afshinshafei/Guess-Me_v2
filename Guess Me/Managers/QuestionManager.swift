@@ -30,6 +30,30 @@ class QuestionManager {
             availableQuestionTypes.append(.smoker)
         }
         
+        if user.favoriteColor != nil {
+            availableQuestionTypes.append(.favoriteColor)
+        }
+        
+        if user.favoriteMovie != nil {
+            availableQuestionTypes.append(.favoriteMovie)
+        }
+        
+        if user.favoriteFood != nil {
+            availableQuestionTypes.append(.favoriteFood)
+        }
+        
+        if user.favoriteFlower != nil {
+            availableQuestionTypes.append(.favoriteFlower)
+        }
+        
+        if user.favoriteSport != nil {
+            availableQuestionTypes.append(.favoriteSport)
+        }
+        
+        if user.favoriteHobby != nil {
+            availableQuestionTypes.append(.favoriteHobby)
+        }
+        
         guard !availableQuestionTypes.isEmpty else {
             return nil
         }
@@ -56,6 +80,18 @@ class QuestionManager {
             question = createWeightQuestion(for: user)
         case .smoker:
             question = createSmokerQuestion(for: user)
+        case .favoriteColor:
+            question = createFavoriteColorQuestion(for: user)
+        case .favoriteMovie:
+            question = createFavoriteMovieQuestion(for: user)
+        case .favoriteFood:
+            question = createFavoriteFoodQuestion(for: user)
+        case .favoriteFlower:
+            question = createFavoriteFlowerQuestion(for: user)
+        case .favoriteSport:
+            question = createFavoriteSportQuestion(for: user)
+        case .favoriteHobby:
+            question = createFavoriteHobbyQuestion(for: user)
         }
         
         // Add the user's profile image URL to the question
@@ -88,8 +124,8 @@ class QuestionManager {
         return Question(
             type: .age,
             text: questionText,
-            choices: ageOptions.map { "\($0)" },
-            correctAnswer: "\(actualAge)"
+            choices: ageOptions.map { String($0) },
+            correctAnswer: String(actualAge)
         )
     }
     
@@ -180,8 +216,8 @@ class QuestionManager {
         return Question(
             type: .height,
             text: questionText,
-            choices: heightOptions.map { "\(Int($0)) cm" },
-            correctAnswer: "\(Int(actualHeight)) cm"
+            choices: heightOptions.map { String(Int($0)) },
+            correctAnswer: String(Int(actualHeight))
         )
     }
     
@@ -209,8 +245,8 @@ class QuestionManager {
         return Question(
             type: .weight,
             text: questionText,
-            choices: weightOptions.map { "\(Int($0)) kg" },
-            correctAnswer: "\(Int(actualWeight)) kg"
+            choices: weightOptions.map { String(Int($0)) },
+            correctAnswer: String(Int(actualWeight))
         )
     }
     
@@ -228,6 +264,187 @@ class QuestionManager {
             text: questionText,
             choices: choices,
             correctAnswer: correctAnswer
+        )
+    }
+    
+    private static func createFavoriteColorQuestion(for user: User) -> Question {
+        guard let actualColor = user.favoriteColor else {
+            fatalError("User favorite color should not be nil when creating favorite color question")
+        }
+        
+        let questionText = "What is this person's favorite color?"
+        
+        let commonColors = [
+            "Red", "Blue", "Green", "Yellow", "Purple", "Orange",
+            "Pink", "Black", "White", "Brown", "Gray", "Teal"
+        ]
+        
+        var colorOptions = [actualColor]
+        while colorOptions.count < 4 {
+            if let randomColor = commonColors.randomElement(),
+               !colorOptions.contains(randomColor) {
+                colorOptions.append(randomColor)
+            }
+        }
+        
+        colorOptions.shuffle()
+        
+        return Question(
+            type: .favoriteColor,
+            text: questionText,
+            choices: colorOptions,
+            correctAnswer: actualColor
+        )
+    }
+    
+    private static func createFavoriteMovieQuestion(for user: User) -> Question {
+        guard let actualMovie = user.favoriteMovie else {
+            fatalError("User favorite movie should not be nil when creating favorite movie question")
+        }
+        
+        let questionText = "What is this person's favorite movie?"
+        
+        let popularMovies = [
+            "The Shawshank Redemption", "The Godfather", "The Dark Knight",
+            "Pulp Fiction", "Forrest Gump", "Inception", "The Matrix",
+            "Goodfellas", "The Lord of the Rings", "Star Wars"
+        ]
+        
+        var movieOptions = [actualMovie]
+        while movieOptions.count < 4 {
+            if let randomMovie = popularMovies.randomElement(),
+               !movieOptions.contains(randomMovie) {
+                movieOptions.append(randomMovie)
+            }
+        }
+        
+        movieOptions.shuffle()
+        
+        return Question(
+            type: .favoriteMovie,
+            text: questionText,
+            choices: movieOptions,
+            correctAnswer: actualMovie
+        )
+    }
+    
+    private static func createFavoriteFoodQuestion(for user: User) -> Question {
+        guard let actualFood = user.favoriteFood else {
+            fatalError("User favorite food should not be nil when creating favorite food question")
+        }
+        
+        let questionText = "What is this person's favorite food?"
+        
+        let commonFoods = [
+            "Pizza", "Sushi", "Burger", "Pasta", "Tacos",
+            "Salad", "Steak", "Curry", "Ramen", "Sandwich"
+        ]
+        
+        var foodOptions = [actualFood]
+        while foodOptions.count < 4 {
+            if let randomFood = commonFoods.randomElement(),
+               !foodOptions.contains(randomFood) {
+                foodOptions.append(randomFood)
+            }
+        }
+        
+        foodOptions.shuffle()
+        
+        return Question(
+            type: .favoriteFood,
+            text: questionText,
+            choices: foodOptions,
+            correctAnswer: actualFood
+        )
+    }
+    
+    private static func createFavoriteFlowerQuestion(for user: User) -> Question {
+        guard let actualFlower = user.favoriteFlower else {
+            fatalError("User favorite flower should not be nil when creating favorite flower question")
+        }
+        
+        let questionText = "What is this person's favorite flower?"
+        
+        let commonFlowers = [
+            "Rose", "Tulip", "Sunflower", "Lily", "Orchid",
+            "Daisy", "Daffodil", "Iris", "Chrysanthemum", "Peony"
+        ]
+        
+        var flowerOptions = [actualFlower]
+        while flowerOptions.count < 4 {
+            if let randomFlower = commonFlowers.randomElement(),
+               !flowerOptions.contains(randomFlower) {
+                flowerOptions.append(randomFlower)
+            }
+        }
+        
+        flowerOptions.shuffle()
+        
+        return Question(
+            type: .favoriteFlower,
+            text: questionText,
+            choices: flowerOptions,
+            correctAnswer: actualFlower
+        )
+    }
+    
+    private static func createFavoriteSportQuestion(for user: User) -> Question {
+        guard let actualSport = user.favoriteSport else {
+            fatalError("User favorite sport should not be nil when creating favorite sport question")
+        }
+        
+        let questionText = "What is this person's favorite sport?"
+        
+        let commonSports = [
+            "Football", "Basketball", "Tennis", "Soccer", "Baseball",
+            "Golf", "Swimming", "Volleyball", "Cricket", "Rugby"
+        ]
+        
+        var sportOptions = [actualSport]
+        while sportOptions.count < 4 {
+            if let randomSport = commonSports.randomElement(),
+               !sportOptions.contains(randomSport) {
+                sportOptions.append(randomSport)
+            }
+        }
+        
+        sportOptions.shuffle()
+        
+        return Question(
+            type: .favoriteSport,
+            text: questionText,
+            choices: sportOptions,
+            correctAnswer: actualSport
+        )
+    }
+    
+    private static func createFavoriteHobbyQuestion(for user: User) -> Question {
+        guard let actualHobby = user.favoriteHobby else {
+            fatalError("User favorite hobby should not be nil when creating favorite hobby question")
+        }
+        
+        let questionText = "What is this person's favorite hobby?"
+        
+        let commonHobbies = [
+            "Reading", "Gaming", "Photography", "Painting", "Gardening",
+            "Cooking", "Traveling", "Music", "Writing", "Hiking"
+        ]
+        
+        var hobbyOptions = [actualHobby]
+        while hobbyOptions.count < 4 {
+            if let randomHobby = commonHobbies.randomElement(),
+               !hobbyOptions.contains(randomHobby) {
+                hobbyOptions.append(randomHobby)
+            }
+        }
+        
+        hobbyOptions.shuffle()
+        
+        return Question(
+            type: .favoriteHobby,
+            text: questionText,
+            choices: hobbyOptions,
+            correctAnswer: actualHobby
         )
     }
 } 

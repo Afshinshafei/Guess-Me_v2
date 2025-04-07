@@ -278,35 +278,35 @@ struct ProfileView: View {
                         switch phase {
                         case .empty:
                             ProgressView()
-                                .profileImageStyle(size: 120)
+                                .profileImageStyle(size: 160)
                         case .success(let image):
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .profileImageStyle(size: 120, borderWidth: 4)
+                                .profileImageStyle(size: 160, borderWidth: 4)
                         case .failure:
                             Image(systemName: "person.fill")
-                                .font(.system(size: 60))
+                                .font(.system(size: 80))
                                 .foregroundColor(AppTheme.textSecondary)
-                                .profileImageStyle(size: 120)
+                                .profileImageStyle(size: 160)
                         @unknown default:
                             EmptyView()
                         }
                     }
                 } else {
                     Image(systemName: "person.fill")
-                        .font(.system(size: 60))
+                        .font(.system(size: 80))
                         .foregroundColor(AppTheme.textSecondary)
-                        .profileImageStyle(size: 120)
+                        .profileImageStyle(size: 160)
                 }
                 
                 Button(action: {
                     showingImagePicker = true
                 }) {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(
                             Circle()
                                 .fill(AppTheme.primary)

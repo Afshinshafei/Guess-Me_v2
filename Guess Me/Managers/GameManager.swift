@@ -6,8 +6,9 @@ class GameManager: ObservableObject {
     @Published var lives: Int = 5
     @Published var lastLifeRegenTime: Date?
     @Published var currentStreak: Int = 0
+    @Published var isRegeneratingLives: Bool = false
     public let maxLives = 5
-    private let lifeRegenerationTimeInSeconds: TimeInterval = 3600 // 1 hour
+    private let lifeRegenerationTimeInSeconds: TimeInterval = 7200 // 2 hours
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var currentUserId: String?
@@ -95,8 +96,12 @@ class GameManager: ObservableObject {
     }
     
     func checkLifeRegeneration() {
-        guard let lastLifeRegenTime = lastLifeRegenTime, lives < maxLives else { return }
+        guard let lastLifeRegenTime = lastLifeRegenTime, lives < maxLives else { 
+            isRegeneratingLives = false
+            return 
+        }
         
+        isRegeneratingLives = true
         let elapsedTime = Date().timeIntervalSince(lastLifeRegenTime)
         let livesToAdd = Int(elapsedTime / lifeRegenerationTimeInSeconds)
         
@@ -110,6 +115,7 @@ class GameManager: ObservableObject {
             } else {
                 // We're at max lives, no need to track regen time
                 self.lastLifeRegenTime = nil
+                isRegeneratingLives = false
             }
             
             saveLivesData()
@@ -119,6 +125,7 @@ class GameManager: ObservableObject {
     func updateLastLifeRegenTime() {
         if lastLifeRegenTime == nil {
             lastLifeRegenTime = Date()
+            isRegeneratingLives = true
             saveLivesData()
         }
     }
@@ -157,7 +164,8 @@ class GameManager: ObservableObject {
         guard let lastLifeRegenTime = lastLifeRegenTime, lives < maxLives else { return nil }
         
         let elapsed = Date().timeIntervalSince(lastLifeRegenTime)
-        return max(lifeRegenerationTimeInSeconds - elapsed.truncatingRemainder(dividingBy: lifeRegenerationTimeInSeconds), 0)
+        let remaining = max(lifeRegenerationTimeInSeconds - elapsed.truncatingRemainder(dividingBy: lifeRegenerationTimeInSeconds), 0)
+        return remaining
     }
     
     // New properties for game mechanics
@@ -183,6 +191,12 @@ class GameManager: ObservableObject {
     func checkGameOver() {
         if lives <= 0 {
             isGameOver = true
+            isRegeneratingLives = true
+            
+            // Make sure we start the life regeneration timer if not already started
+            if lastLifeRegenTime == nil {
+                updateLastLifeRegenTime()
+            }
         }
     }
     

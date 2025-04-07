@@ -37,24 +37,24 @@ struct GameQuestionCard: View {
                         switch phase {
                         case .empty:
                             ProgressView()
-                                .profileImageStyle(size: 100)
+                                .profileImageStyle(size: 140)
                         case .success(let image):
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .profileImageStyle(size: 100, borderWidth: 3)
+                                .profileImageStyle(size: 140, borderWidth: 3)
                         case .failure:
                             Image(systemName: "person.circle.fill")
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .foregroundColor(AppTheme.secondary)
-                                .frame(width: 100, height: 100)
+                                .frame(width: 140, height: 140)
                         @unknown default:
                             Image(systemName: "person.circle.fill")
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .foregroundColor(AppTheme.secondary)
-                                .frame(width: 100, height: 100)
+                                .frame(width: 140, height: 140)
                         }
                     }
                     .accessibilityLabel("Profile image")
@@ -63,12 +63,12 @@ struct GameQuestionCard: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .foregroundColor(AppTheme.secondary)
-                        .frame(width: 100, height: 100)
+                        .frame(width: 140, height: 140)
                         .accessibilityLabel("Profile image placeholder")
                 }
             }
-            .frame(width: 100, height: 100)
-            .padding(.vertical, 8)
+            .frame(width: 140, height: 140)
+            .padding(.vertical, 12)
             
             // Question text
             Text(question.text)
@@ -169,6 +169,18 @@ struct GameQuestionCard: View {
             return "scalemass.fill"
         case .smoker:
             return "smoke.fill"
+        case .favoriteColor:
+            return "paintpalette.fill"
+        case .favoriteMovie:
+            return "film.fill"
+        case .favoriteFood:
+            return "fork.knife"
+        case .favoriteFlower:
+            return "leaf.fill"
+        case .favoriteSport:
+            return "sportscourt.fill"
+        case .favoriteHobby:
+            return "heart.fill"
         }
     }
     
@@ -186,6 +198,18 @@ struct GameQuestionCard: View {
             return AppTheme.correct
         case .smoker:
             return Color.orange
+        case .favoriteColor:
+            return Color.purple
+        case .favoriteMovie:
+            return Color.indigo
+        case .favoriteFood:
+            return Color.orange
+        case .favoriteFlower:
+            return Color.pink
+        case .favoriteSport:
+            return Color.green
+        case .favoriteHobby:
+            return Color.red
         }
     }
 }

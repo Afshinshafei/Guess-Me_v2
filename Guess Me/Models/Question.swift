@@ -15,5 +15,11 @@ struct Question: Identifiable {
         case height = "Height"
         case weight = "Weight"
         case smoker = "Smoker"
+        case favoriteColor = "Favorite Color"
+        case favoriteMovie = "Favorite Movie"
+        case favoriteFood = "Favorite Food"
+        case favoriteFlower = "Favorite Flower"
+        case favoriteSport = "Favorite Sport"
+        case favoriteHobby = "Favorite Hobby"
     }
 } 

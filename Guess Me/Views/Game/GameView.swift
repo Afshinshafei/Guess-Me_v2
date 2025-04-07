@@ -77,8 +77,14 @@ class GameViewModel: ObservableObject {
     func checkAnswer(_ answer: String) {
         guard let question = currentQuestion,
               let currentUser = authService.user,
-              let currentUserId = currentUser.id,
-              gameManager.lives > 0 else {
+              let currentUserId = currentUser.id else {
+            return
+        }
+        
+        // Check if we have lives left
+        if gameManager.lives <= 0 {
+            // If we're out of lives, make sure the game is marked as over
+            gameManager.isGameOver = true
             return
         }
         
@@ -163,6 +169,11 @@ class GameViewModel: ObservableObject {
         } else {
             // Game over if we're out of lives
             gameManager.isGameOver = true
+            
+            // Update last life regeneration time if not already set
+            if gameManager.lastLifeRegenTime == nil {
+                gameManager.updateLastLifeRegenTime()
+            }
         }
         
         isLoadingNextUser = false
@@ -205,6 +216,8 @@ struct GameView: View {
     @State private var showExitAlert = false
     @State private var animateBackground = false
     @StateObject private var viewModel: GameViewModel
+    @State private var showRewardedAd = false
+    @State private var showNoLivesOverlay = false
     
     init() {
         // Initialize with a temporary view model, will be updated in onAppear
@@ -245,11 +258,37 @@ struct GameView: View {
                     onDismiss: { viewModel.showNewAchievementAlert = false }
                 )
             }
+            
+            // No lives overlay
+            if gameManager.lives <= 0 {
+                NoLivesOverlayView(
+                    timeUntilNextLife: gameManager.timeUntilNextLife(),
+                    onWatchAd: {
+                        showRewardedAd = true
+                    },
+                    onExit: {
+                        dismiss()
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(1) // Ensure it's above other content
+            }
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
             // Update the view model with the current services
             viewModel.updateServices(authService: authService, gameManager: gameManager)
+            
+            // Check if we're out of lives
+            if gameManager.lives <= 0 {
+                gameManager.isGameOver = true
+                showNoLivesOverlay = true
+                
+                // Make sure we start the life regeneration timer if not already started
+                if gameManager.lastLifeRegenTime == nil {
+                    gameManager.updateLastLifeRegenTime()
+                }
+            }
             
             // Load users from Firebase
             viewModel.loadUsers()
@@ -260,6 +299,16 @@ struct GameView: View {
                 for (index, user) in viewModel.targetUsers.enumerated() {
                     print("DEBUG: User \(index) image URL: \(user.profileImageURL ?? "none")")
                 }
+            }
+        }
+        .fullScreenCover(isPresented: $showRewardedAd) {
+            RewardedAdView { success in
+                if success {
+                    // Reset lives to max when ad is successfully watched
+                    gameManager.resetLives()
+                    showNoLivesOverlay = false
+                }
+                showRewardedAd = false
             }
         }
     }
@@ -314,8 +363,8 @@ struct GameMainContentView: View {
                     if viewModel.isLoading {
                         // Loading state
                         GameLoadingView()
-                    } else if gameManager.isGameOver {
-                        // Game over view
+                    } else if gameManager.isGameOver && gameManager.lives > 0 {
+                        // Game over view (only show if we have lives)
                         GameOverView(
                             score: gameManager.score,
                             correctAnswers: gameManager.correctAnswers,
@@ -365,7 +414,7 @@ struct GameMainContentView: View {
             
             // Add banner ad at the bottom
             BannerAdView()
-                .frame(height: 50)
+                .frame(height: 45)
                 .background(AppTheme.cardBackground)
                 .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: -2)
         }
@@ -492,20 +541,6 @@ struct GameHeaderView: View {
     
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
-            // Exit button
-            Button(action: onExit) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppTheme.textSecondary)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle()
-                            .fill(AppTheme.cardBackground)
-                            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-                    )
-            }
-            .buttonStyle(ScaleButtonStyle())
-            
             // Lives indicator
             HStack(spacing: 4) {
                 ForEach(0..<gameManager.maxLives, id: \.self) { index in
@@ -680,6 +715,145 @@ struct AccuracyRingView: View {
                 Text("%")
                     .font(AppTheme.caption())
                     .foregroundColor(AppTheme.textSecondary)
+            }
+        }
+    }
+}
+
+// MARK: - No Lives Overlay View
+struct NoLivesOverlayView: View {
+    let timeUntilNextLife: TimeInterval?
+    let onWatchAd: () -> Void
+    let onExit: () -> Void
+    @State private var timeRemaining: TimeInterval = 0
+    @State private var timer: Timer? = nil
+    
+    var body: some View {
+        ZStack {
+            // Blurred background
+            Color.black.opacity(0.7)
+                .ignoresSafeArea()
+            
+            // Content
+            VStack(spacing: 20) {
+                // Icon
+                Image(systemName: "heart.slash.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(AppTheme.error)
+                    .padding(.bottom, 5)
+                
+                // Title
+                Text("Out of Lives!")
+                    .font(AppTheme.title())
+                    .foregroundColor(AppTheme.textPrimary)
+                
+                // Countdown timer
+                if let timeUntilNextLife = timeUntilNextLife, timeUntilNextLife > 0 {
+                    VStack(spacing: 5) {
+                        Text("Next life in:")
+                            .font(AppTheme.subheading())
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        Text(formatTime(timeRemaining))
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .foregroundColor(AppTheme.primary)
+                    }
+                    .padding(.vertical, 10)
+                }
+                
+                // Watch Ad button
+                Button(action: onWatchAd) {
+                    HStack {
+                        Image(systemName: "play.circle.fill")
+                        Text("Watch Ad for Lives")
+                    }
+                    .fillWidth()
+                    .padding(.vertical, 14)
+                }
+                .primaryButtonStyle()
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.horizontal, 20)
+                .padding(.top, 5)
+            }
+            .padding(25)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(AppTheme.cardBackground)
+            )
+            .floatingCardStyle()
+            .padding(.horizontal, 30)
+            .frame(maxWidth: 320)
+        }
+        .onAppear {
+            if let timeUntilNextLife = timeUntilNextLife {
+                timeRemaining = timeUntilNextLife
+                
+                // Set up timer to update countdown
+                timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+                    if timeRemaining > 0 {
+                        timeRemaining -= 1
+                    } else {
+                        timer?.invalidate()
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            timer?.invalidate()
+        }
+    }
+    
+    private func formatTime(_ timeInterval: TimeInterval) -> String {
+        let hours = Int(timeInterval) / 3600
+        let minutes = Int(timeInterval) / 60 % 60
+        let seconds = Int(timeInterval) % 60
+        
+        if hours > 0 {
+            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            return String(format: "%02d:%02d", minutes, seconds)
+        }
+    }
+}
+
+// MARK: - Rewarded Ad View
+struct RewardedAdView: View {
+    let completion: (Bool) -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.9)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                Text("Loading Ad...")
+                    .font(AppTheme.title())
+                    .foregroundColor(AppTheme.textPrimary)
+                
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .tint(AppTheme.primary)
+                
+                Text("Please wait while we load the ad")
+                    .font(AppTheme.body())
+                    .foregroundColor(AppTheme.textSecondary)
+            }
+        }
+        .onAppear {
+            // Get the root view controller
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let rootViewController = windowScene.windows.first?.rootViewController {
+                
+                // Show the rewarded ad
+                AdMobManager.shared.showRewardedAd(from: rootViewController) { success in
+                    completion(success)
+                    dismiss()
+                }
+            } else {
+                // Fallback if we can't get the root view controller
+                completion(false)
+                dismiss()
             }
         }
     }

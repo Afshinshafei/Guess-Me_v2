@@ -50,7 +50,7 @@ struct MainTabView: View {
                         
                         // Ad Banner
                         BannerAdView()
-                            .frame(height: 50)
+                            .frame(height: 45)
                             .background(Color(UIColor.systemBackground))
                     }
                 }
@@ -139,40 +139,48 @@ struct CustomTabBar: View {
             
             // Game Tab Button - Center "GUESS NOW" button
             ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                AppTheme.primary,
-                                AppTheme.tertiary
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                VStack(spacing: 0) {
+                    // Button
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    AppTheme.primary,
+                                    AppTheme.tertiary
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .frame(width: 60, height: 60)
-                    .shadow(color: AppTheme.primary.opacity(0.3), radius: 6, x: 0, y: 3)
-                
-                VStack(spacing: 2) {
-                    Image(systemName: "gamecontroller.fill")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 24, height: 24)
-                        .foregroundColor(AppTheme.textOnDark)
+                        .frame(width: 48, height: 48)
+                        .shadow(color: AppTheme.primary.opacity(0.3), radius: 4, x: 0, y: 2)
+                        .overlay(
+                            Image(systemName: "gamecontroller.fill")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 22, height: 22)
+                                .foregroundColor(AppTheme.textOnDark)
+                        )
+                        .scaleEffect(isAnimating[1] ? 1.1 : 1.0)
+                        .offset(y: -12)
                     
+                    // Text below the button
                     Text("GUESS NOW")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundColor(AppTheme.textOnDark)
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                        .foregroundColor(selectedTab == 1 ? AppTheme.primary : AppTheme.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.top, 4)
+                        .padding(.bottom, 2)
+                        .offset(y: -4)
                 }
             }
-            .scaleEffect(isAnimating[1] ? 1.1 : 1.0)
             .onTapGesture {
                 withAnimation(.springy) {
                     selectedTab = 1
                     animateButton(at: 1)
                 }
             }
-            .offset(y: -20)
             
             // Profile Tab Button
             tabBarButton(
@@ -181,36 +189,37 @@ struct CustomTabBar: View {
                 index: 2
             )
         }
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.top, 0)
+        .padding(.bottom, 2)
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 16)
                 .fill(Color(UIColor.systemBackground))
-                .shadow(color: Color.black.opacity(0.08), radius: 8, y: -1)
+                .shadow(color: Color.black.opacity(0.06), radius: 6, y: -1)
                 .background(GeometryReader { geo in
                     Color.clear.onAppear {
                         tabBarHeight = geo.size.height
                     }
                 })
         )
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
     }
     
     private func tabBarButton(title: String, icon: String, index: Int) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             Image(systemName: icon)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 24, height: 24)
+                .frame(width: 20, height: 20)
                 .foregroundColor(selectedTab == index ? AppTheme.primary : AppTheme.textSecondary)
                 .scaleEffect(isAnimating[index] ? 1.2 : 1.0)
             
             Text(title)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
                 .foregroundColor(selectedTab == index ? AppTheme.primary : AppTheme.textSecondary)
+                .padding(.bottom, 4)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 44) // Apple's minimum touch target size
+        .frame(height: 34) // Reduced from 36 to 34
         .opacity(selectedTab == 1 && index != 1 ? 0.7 : 1.0)
         .onTapGesture {
             withAnimation(.springy) {

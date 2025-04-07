@@ -12,6 +12,12 @@ struct User: Identifiable, Codable {
     var height: Double?
     var weight: Double?
     var smoker: Bool?
+    var favoriteColor: String?
+    var favoriteMovie: String?
+    var favoriteFood: String?
+    var favoriteFlower: String?
+    var favoriteSport: String?
+    var favoriteHobby: String?
     var score: Int = 0
     var achievements: [String] = []
     var streak: Int = 0
@@ -30,7 +36,13 @@ struct User: Identifiable, Codable {
          occupation: String? = nil, 
          height: Double? = nil, 
          weight: Double? = nil, 
-         smoker: Bool? = nil, 
+         smoker: Bool? = nil,
+         favoriteColor: String? = nil,
+         favoriteMovie: String? = nil,
+         favoriteFood: String? = nil,
+         favoriteFlower: String? = nil,
+         favoriteSport: String? = nil,
+         favoriteHobby: String? = nil,
          score: Int = 0, 
          achievements: [String] = [], 
          streak: Int = 0, 
@@ -49,6 +61,12 @@ struct User: Identifiable, Codable {
         self.height = height
         self.weight = weight
         self.smoker = smoker
+        self.favoriteColor = favoriteColor
+        self.favoriteMovie = favoriteMovie
+        self.favoriteFood = favoriteFood
+        self.favoriteFlower = favoriteFlower
+        self.favoriteSport = favoriteSport
+        self.favoriteHobby = favoriteHobby
         self.score = score
         self.achievements = achievements
         self.streak = streak
@@ -69,6 +87,12 @@ struct User: Identifiable, Codable {
         case height
         case weight
         case smoker
+        case favoriteColor
+        case favoriteMovie
+        case favoriteFood
+        case favoriteFlower
+        case favoriteSport
+        case favoriteHobby
         case score
         case achievements
         case streak
