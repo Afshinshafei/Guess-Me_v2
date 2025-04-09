@@ -177,6 +177,7 @@ struct ProfileView: View {
     @State private var animateBackground = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showAllAchievements = false
+    @State private var showingEditProfile = false
     
     private var earnedCount: Int {
         authService.user?.achievements.count ?? 0
@@ -211,8 +212,8 @@ struct ProfileView: View {
                 ScrollView {
                     VStack(spacing: 25) {
                         profileHeader
-                        statsCard
                         achievementsPreview
+                        userInfoCard
                         settingsSection
                     }
                     .padding(.horizontal, 20)
@@ -220,6 +221,17 @@ struct ProfileView: View {
                 }
                 .navigationTitle("Profile")
                 .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            showingEditProfile = true
+                        }) {
+                            Text("Edit Profile")
+                                .font(AppTheme.body())
+                                .foregroundColor(AppTheme.primary)
+                        }
+                    }
+                }
                 
                 // Loading overlay
                 if isLoading {
@@ -255,6 +267,10 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $isShowingAchievements) {
                 AchievementsView()
+            }
+            .sheet(isPresented: $showingEditProfile) {
+                ProfileEditView()
+                    .environmentObject(authService)
             }
             .alert(isPresented: $showingLogoutAlert) {
                 Alert(
@@ -317,65 +333,10 @@ struct ProfileView: View {
             }
             .padding(.bottom, 8)
             
-            // Username with edit option
-            if isEditing {
-                HStack {
-                    TextField("Username", text: $editedUsername)
-                        .font(AppTheme.heading())
-                        .foregroundColor(AppTheme.textPrimary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(AppTheme.cardBackground)
-                                .shadow(color: Color.black.opacity(0.05), radius: 2)
-                        )
-                    
-                    Button(action: {
-                        // Update username locally instead of using the service
-                        isLoading = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            // In a real app, this would call your auth service
-                            isLoading = false
-                            isEditing = false
-                        }
-                    }) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(AppTheme.correct)
-                                    .shadow(color: AppTheme.correct.opacity(0.3), radius: 3)
-                            )
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .disabled(editedUsername.isEmpty || editedUsername == authService.user?.username)
-                }
-            } else {
-                HStack {
-                    Text(authService.user?.username ?? "User")
-                        .font(AppTheme.heading())
-                        .foregroundColor(AppTheme.textPrimary)
-                    
-                    Button(action: {
-                        editedUsername = authService.user?.username ?? ""
-                        isEditing = true
-                    }) {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(AppTheme.textSecondary)
-                            .frame(width: 26, height: 26)
-                            .background(
-                                Circle()
-                                    .fill(AppTheme.textSecondary.opacity(0.15))
-                            )
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
+            // Username display (removed edit functionality)
+            Text(authService.user?.username ?? "User")
+                .font(AppTheme.heading())
+                .foregroundColor(AppTheme.textPrimary)
             
             // User email
             Text(authService.user?.email ?? "")
@@ -389,71 +350,6 @@ struct ProfileView: View {
                 .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
         )
         .floatingCardStyle()
-    }
-    
-    private var statsCard: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("Game Stats")
-                .font(AppTheme.subheading())
-                .foregroundColor(AppTheme.textPrimary)
-            
-            HStack(spacing: 12) {
-                StatItem(
-                    label: "Score",
-                    value: "\(authService.user?.score ?? 0)",
-                    icon: "trophy.fill",
-                    color: AppTheme.secondary
-                )
-                
-                StatItem(
-                    label: "Streak",
-                    value: "\(authService.user?.highestStreak ?? 0)",
-                    icon: "flame.fill",
-                    color: AppTheme.accent
-                )
-                
-                StatItem(
-                    label: "Accuracy",
-                    value: calculateAccuracyString(),
-                    icon: "target",
-                    color: AppTheme.tertiary
-                )
-            }
-            
-            Divider()
-                .padding(.vertical, 5)
-            
-            // Game stats
-            VStack(spacing: 16) {
-                StatRow(
-                    label: "Correct Guesses",
-                    value: "\(authService.user?.correctGuesses ?? 0)",
-                    icon: "checkmark.circle.fill",
-                    color: AppTheme.correct
-                )
-                
-                StatRow(
-                    label: "Total Guesses",
-                    value: "\(authService.user?.totalGuesses ?? 0)",
-                    icon: "number.circle",
-                    color: AppTheme.primary
-                )
-                
-                StatRow(
-                    label: "Games Played",
-                    value: "\(authService.user?.totalGuesses ?? 0 / 5)", // Approximate games played as total guesses divided by 5
-                    icon: "gamecontroller.fill",
-                    color: AppTheme.secondary
-                )
-            }
-            .padding(.vertical, 8)
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(AppTheme.cardBackground)
-                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-        )
     }
     
     private var achievementsPreview: some View {
@@ -550,48 +446,152 @@ struct ProfileView: View {
         )
     }
     
-    // Break out the achievement items to reduce complexity
-    private var achievementItems: some View {
-        HStack(spacing: 16) {
-            // Show last 3 earned achievements or placeholders if none
-            let achievements = Array(authService.user?.achievements ?? [])
+    private var userInfoCard: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Your Information")
+                .font(AppTheme.subheading())
+                .foregroundColor(AppTheme.textPrimary)
             
-            if achievements.isEmpty {
-                ForEach(0..<3, id: \.self) { _ in
-                    AchievementPreviewItem(
-                        title: "Locked",
-                        icon: "lock.fill",
-                        color: AppTheme.textSecondary.opacity(0.3),
-                        isLocked: true
+            VStack(spacing: 16) {
+                if let user = authService.user {
+                    // Basic Info
+                    InfoRow(
+                        label: "Username",
+                        value: user.username,
+                        icon: "person.fill",
+                        color: AppTheme.primary
                     )
-                }
-            } else {
-                // Only show up to 3 achievements
-                let displayAchievements = Array(achievements.prefix(3))
-                ForEach(Array(displayAchievements.enumerated()), id: \.offset) { index, achievementId in
-                    if let achievement = Achievement.allAchievements.first(where: { $0.id == achievementId }) {
-                        AchievementPreviewItem(
-                            title: achievement.name,
-                            icon: achievement.imageName,
-                            color: getColorForAchievement(type: achievement.type),
-                            isLocked: false
+                    
+                    if let age = user.age {
+                        InfoRow(
+                            label: "Age",
+                            value: "\(age)",
+                            icon: "calendar",
+                            color: AppTheme.primary
                         )
                     }
+                    
+                    if let occupation = user.occupation, !occupation.isEmpty {
+                        InfoRow(
+                            label: "Occupation",
+                            value: occupation,
+                            icon: "briefcase.fill",
+                            color: AppTheme.tertiary
+                        )
+                    }
+                    
+                    if let education = user.education, !education.isEmpty {
+                        InfoRow(
+                            label: "Education",
+                            value: education,
+                            icon: "book.fill",
+                            color: AppTheme.tertiary
+                        )
+                    }
+                    
+                    if let height = user.height {
+                        InfoRow(
+                            label: "Height",
+                            value: "\(Int(height)) cm",
+                            icon: "ruler",
+                            color: AppTheme.tertiary
+                        )
+                    }
+                    
+                    if let weight = user.weight {
+                        InfoRow(
+                            label: "Weight",
+                            value: "\(Int(weight)) kg",
+                            icon: "scalemass",
+                            color: AppTheme.tertiary
+                        )
+                    }
+                    
+                    InfoRow(
+                        label: "Smoker",
+                        value: user.smoker ?? false ? "Yes" : "No",
+                        icon: user.smoker ?? false ? "smoke.fill" : "smoke",
+                        color: AppTheme.tertiary
+                    )
+                    
+                    Divider()
+                        .padding(.vertical, 5)
+                    
+                    // Preferences
+                    Text("Your Preferences")
+                        .font(AppTheme.body())
+                        .foregroundColor(AppTheme.textPrimary)
+                        .padding(.top, 5)
+                    
+                    if let favoriteColor = user.favoriteColor, !favoriteColor.isEmpty {
+                        InfoRow(
+                            label: "Favorite Color",
+                            value: favoriteColor,
+                            icon: "paintpalette.fill",
+                            color: Color.purple
+                        )
+                    }
+                    
+                    if let favoriteMovie = user.favoriteMovie, !favoriteMovie.isEmpty {
+                        InfoRow(
+                            label: "Favorite Movie",
+                            value: favoriteMovie,
+                            icon: "film.fill",
+                            color: Color.indigo
+                        )
+                    }
+                    
+                    if let favoriteFood = user.favoriteFood, !favoriteFood.isEmpty {
+                        InfoRow(
+                            label: "Favorite Food",
+                            value: favoriteFood,
+                            icon: "fork.knife",
+                            color: Color.orange
+                        )
+                    }
+                    
+                    if let favoriteFlower = user.favoriteFlower, !favoriteFlower.isEmpty {
+                        InfoRow(
+                            label: "Favorite Flower",
+                            value: favoriteFlower,
+                            icon: "leaf.fill",
+                            color: Color.pink
+                        )
+                    }
+                    
+                    if let favoriteSport = user.favoriteSport, !favoriteSport.isEmpty {
+                        InfoRow(
+                            label: "Favorite Sport",
+                            value: favoriteSport,
+                            icon: "sportscourt.fill",
+                            color: Color.green
+                        )
+                    }
+                    
+                    if let favoriteHobby = user.favoriteHobby, !favoriteHobby.isEmpty {
+                        InfoRow(
+                            label: "Favorite Hobby",
+                            value: favoriteHobby,
+                            icon: "heart.fill",
+                            color: Color.red
+                        )
+                    }
+                } else {
+                    Text("No user information available")
+                        .font(AppTheme.body())
+                        .foregroundColor(AppTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
                 }
             }
+            .padding(.vertical, 8)
         }
-        .padding(.vertical, 10)
-    }
-    
-    private func getColorForAchievement(type: Achievement.AchievementType) -> Color {
-        switch type {
-        case .correctGuesses:
-            return AppTheme.correct
-        case .streak:
-            return AppTheme.accent
-        case .totalGuesses:
-            return AppTheme.primary
-        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(AppTheme.cardBackground)
+                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        )
     }
     
     private var settingsSection: some View {
@@ -850,5 +850,452 @@ extension Binding {
                 handler(newValue)
             }
         )
+    }
+}
+
+// New ProfileEditView for editing profile information
+struct ProfileEditView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authService: AuthenticationService
+    @StateObject private var viewModel: ProfileSetupViewModel
+    @State private var animateBackground = false
+    
+    init() {
+        // Initialize with the current auth service
+        _viewModel = StateObject(wrappedValue: ProfileSetupViewModel(authService: AuthenticationService()))
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Animated gradient background
+                LinearGradient(
+                    colors: [
+                        AppTheme.primary.opacity(0.8),
+                        AppTheme.tertiary.opacity(0.6),
+                        AppTheme.secondary.opacity(0.7)
+                    ],
+                    startPoint: animateBackground ? .topLeading : .bottomLeading,
+                    endPoint: animateBackground ? .bottomTrailing : .topTrailing
+                )
+                .hueRotation(.degrees(animateBackground ? 45 : 0))
+                .ignoresSafeArea()
+                .onAppear {
+                    withAnimation(.linear(duration: 20).repeatForever(autoreverses: true)) {
+                        animateBackground.toggle()
+                    }
+                }
+                
+                ScrollView {
+                    VStack(spacing: 25) {
+                        // Header
+                        VStack(spacing: 8) {
+                            Text("Edit Your Profile")
+                                .font(AppTheme.title())
+                                .foregroundColor(AppTheme.textOnDark)
+                                .shadow(color: Color.black.opacity(0.1), radius: 1, x: 0, y: 1)
+                            
+                            Text("Update your information")
+                                .font(AppTheme.body())
+                                .foregroundColor(AppTheme.textOnDark.opacity(0.9))
+                                .padding(.bottom, 5)
+                        }
+                        .padding(.top, 10)
+                        
+                        // Content container
+                        VStack(spacing: 25) {
+                            // Basic info section
+                            basicInfoSection
+                            
+                            // Details section
+                            detailsSection
+                            
+                            // Preferences section
+                            preferencesSection
+                            
+                            // Save button
+                            Button(action: {
+                                Task {
+                                    await saveProfile()
+                                }
+                            }) {
+                                Text("Save Changes")
+                                    .font(.system(.body, design: .rounded, weight: .bold))
+                                    .foregroundColor(AppTheme.textOnDark)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(AppTheme.secondary)
+                                            .shadow(color: AppTheme.secondary.opacity(0.3), radius: 8, x: 0, y: 4)
+                                    )
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                            .padding(.top, 10)
+                        }
+                        .padding(25)
+                        .background(
+                            RoundedRectangle(cornerRadius: 30)
+                                .fill(AppTheme.cardBackground.opacity(0.8))
+                                .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
+                        )
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 30)
+                }
+            }
+            .navigationTitle("Edit Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                // Replace the viewModel with one that uses the environment object
+                viewModel.authService = authService
+                viewModel.loadUserDataFromService()
+            }
+            .onReceive(authService.$user) { user in
+                // Update if user changes
+                if user != nil {
+                    viewModel.loadUserDataFromService()
+                }
+            }
+            .alert(isPresented: $viewModel.showError) {
+                Alert(
+                    title: Text("Error"),
+                    message: Text(viewModel.errorMessage ?? "An unknown error occurred"),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+        }
+    }
+    
+    private var basicInfoSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Basic Information")
+                .font(AppTheme.heading())
+                .foregroundColor(AppTheme.textPrimary)
+                .padding(.bottom, 5)
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Username")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Username", text: $viewModel.username)
+                    .textFieldStyle(icon: "person.fill", iconColor: AppTheme.primary)
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Age")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Age", text: $viewModel.age)
+                    .textFieldStyle(icon: "calendar", iconColor: AppTheme.primary)
+                    .keyboardType(.numberPad)
+            }
+        }
+    }
+    
+    private var detailsSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("More About You")
+                .font(AppTheme.heading())
+                .foregroundColor(AppTheme.textPrimary)
+                .padding(.bottom, 5)
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Occupation")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Occupation", text: $viewModel.occupation)
+                    .textFieldStyle(icon: "briefcase.fill", iconColor: AppTheme.tertiary)
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Education")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                Menu {
+                    ForEach(0..<viewModel.educationLevels.count, id: \.self) { index in
+                        Button(action: {
+                            withAnimation(.springy) {
+                                viewModel.selectedEducationIndex = index
+                            }
+                        }) {
+                            HStack {
+                                Text(viewModel.educationLevels[index])
+                                    .foregroundColor(AppTheme.textPrimary)
+                                
+                                if index == viewModel.selectedEducationIndex {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(AppTheme.tertiary)
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "book.fill")
+                            .foregroundColor(AppTheme.tertiary)
+                        
+                        Text(viewModel.educationLevels[viewModel.selectedEducationIndex])
+                            .foregroundColor(AppTheme.textPrimary)
+                            .font(AppTheme.body())
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.down")
+                            .foregroundColor(AppTheme.tertiary)
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppTheme.cardBackground)
+                            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppTheme.tertiary.opacity(0.3), lineWidth: 1)
+                    )
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Height (cm)")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                Menu {
+                    ForEach(0..<viewModel.heightOptions.count, id: \.self) { index in
+                        Button(action: {
+                            withAnimation(.springy) {
+                                viewModel.selectedHeightIndex = index
+                            }
+                        }) {
+                            HStack {
+                                Text("\(viewModel.heightOptions[index]) cm")
+                                    .foregroundColor(AppTheme.textPrimary)
+                                
+                                if index == viewModel.selectedHeightIndex {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(AppTheme.tertiary)
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "ruler")
+                            .foregroundColor(AppTheme.tertiary)
+                        
+                        Text("\(viewModel.heightOptions[viewModel.selectedHeightIndex]) cm")
+                            .foregroundColor(AppTheme.textPrimary)
+                            .font(AppTheme.body())
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.down")
+                            .foregroundColor(AppTheme.tertiary)
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppTheme.cardBackground)
+                            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppTheme.tertiary.opacity(0.3), lineWidth: 1)
+                    )
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Weight (kg)")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                Menu {
+                    ForEach(0..<viewModel.weightOptions.count, id: \.self) { index in
+                        Button(action: {
+                            withAnimation(.springy) {
+                                viewModel.selectedWeightIndex = index
+                            }
+                        }) {
+                            HStack {
+                                Text("\(viewModel.weightOptions[index]) kg")
+                                    .foregroundColor(AppTheme.textPrimary)
+                                
+                                if index == viewModel.selectedWeightIndex {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(AppTheme.tertiary)
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "scalemass")
+                            .foregroundColor(AppTheme.tertiary)
+                        
+                        Text("\(viewModel.weightOptions[viewModel.selectedWeightIndex]) kg")
+                            .foregroundColor(AppTheme.textPrimary)
+                            .font(AppTheme.body())
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.down")
+                            .foregroundColor(AppTheme.tertiary)
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppTheme.cardBackground)
+                            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppTheme.tertiary.opacity(0.3), lineWidth: 1)
+                    )
+                }
+            }
+            
+            HStack {
+                Text("Smoker")
+                    .font(AppTheme.body())
+                    .foregroundColor(AppTheme.textPrimary)
+                
+                Spacer()
+                
+                Toggle("", isOn: $viewModel.smoker)
+                    .toggleStyle(SwitchToggleStyle(tint: AppTheme.tertiary))
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(AppTheme.cardBackground)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(AppTheme.tertiary.opacity(0.3), lineWidth: 1)
+            )
+        }
+    }
+    
+    private var preferencesSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Your Preferences")
+                .font(AppTheme.heading())
+                .foregroundColor(AppTheme.textPrimary)
+                .padding(.bottom, 5)
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Favorite Color")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Favorite Color", text: $viewModel.favoriteColor)
+                    .textFieldStyle(icon: "paintpalette.fill", iconColor: Color.purple)
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Favorite Movie")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Favorite Movie", text: $viewModel.favoriteMovie)
+                    .textFieldStyle(icon: "film.fill", iconColor: Color.indigo)
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Favorite Food")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Favorite Food", text: $viewModel.favoriteFood)
+                    .textFieldStyle(icon: "fork.knife", iconColor: Color.orange)
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Favorite Flower")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Favorite Flower", text: $viewModel.favoriteFlower)
+                    .textFieldStyle(icon: "leaf.fill", iconColor: Color.pink)
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Favorite Sport")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Favorite Sport", text: $viewModel.favoriteSport)
+                    .textFieldStyle(icon: "sportscourt.fill", iconColor: Color.green)
+            }
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Favorite Hobby")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                
+                TextField("Favorite Hobby", text: $viewModel.favoriteHobby)
+                    .textFieldStyle(icon: "heart.fill", iconColor: Color.red)
+            }
+        }
+    }
+    
+    private func saveProfile() async {
+        do {
+            // Call the viewModel's saveProfile method
+            try await viewModel.saveProfile()
+            dismiss()
+        } catch {
+            print("Error saving profile: \(error)")
+            viewModel.errorMessage = "Failed to save profile: \(error.localizedDescription)"
+            viewModel.showError = true
+        }
+    }
+}
+
+struct InfoRow: View {
+    let label: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(color)
+                .frame(width: 36, height: 36)
+                .background(
+                    Circle()
+                        .fill(color.opacity(0.15))
+                )
+            
+            Text(label)
+                .font(AppTheme.body())
+                .foregroundColor(AppTheme.textPrimary)
+            
+            Spacer()
+            
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(AppTheme.textPrimary)
+        }
     }
 } 

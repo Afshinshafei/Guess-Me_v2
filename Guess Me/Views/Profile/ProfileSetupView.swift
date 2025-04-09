@@ -176,7 +176,7 @@ final class ProfileSetupViewModel: ObservableObject, Sendable {
         showError = true
     }
     
-    private func saveProfile() async throws {
+    func saveProfile() async throws {
         guard var user = authService.user else { 
             errorMessage = "Error: No user available to save profile"
             showError = true
