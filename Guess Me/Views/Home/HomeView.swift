@@ -277,7 +277,7 @@ struct HomeView: View {
                 GridItem(.flexible())
             ], spacing: 15) {
                 ForEach(Achievement.allAchievements.prefix(6), id: \.id) { achievement in
-                    AwardBadgeView(
+                    AchievementBadgeView(
                         achievement: achievement,
                         isEarned: authService.user?.achievements.contains(achievement.id) ?? false,
                         progress: calculateProgress(for: achievement)

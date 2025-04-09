@@ -57,24 +57,26 @@ struct AuthView: View {
                     
                     // Auth form container
                     VStack {
-                        // Auth form
-                        if isSigningUp {
-                            SignUpView(isSigningUp: $isSigningUp)
-                        } else {
-                            SignInView(isSigningUp: $isSigningUp)
-                        }
-                        
-                        // Error message display
-                        if let errorMessage = authService.errorMessage {
-                            Text(errorMessage)
-                                .font(AppTheme.caption())
-                                .foregroundColor(AppTheme.incorrect)
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(AppTheme.incorrect.opacity(0.1))
-                                )
-                                .padding(.top, 10)
+                        ScrollView(showsIndicators: false) {
+                            // Auth form
+                            if isSigningUp {
+                                SignUpView(isSigningUp: $isSigningUp)
+                            } else {
+                                SignInView(isSigningUp: $isSigningUp)
+                            }
+                            
+                            // Error message display
+                            if let errorMessage = authService.errorMessage {
+                                Text(errorMessage)
+                                    .font(AppTheme.caption())
+                                    .foregroundColor(AppTheme.incorrect)
+                                    .padding()
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(AppTheme.incorrect.opacity(0.1))
+                                    )
+                                    .padding(.top, 10)
+                            }
                         }
                     }
                     .padding(24)
@@ -84,6 +86,7 @@ struct AuthView: View {
                             .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
                     )
                     .padding(.horizontal)
+                    .frame(maxHeight: UIScreen.main.bounds.height * 0.7)
                 }
                 .padding(.vertical, 40)
                 .navigationBarHidden(true)

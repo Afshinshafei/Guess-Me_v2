@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct AwardBadgeView: View {
+struct AchievementBadgeView: View {
     let achievement: Achievement
     let isEarned: Bool
     let progress: Double
@@ -107,11 +107,9 @@ struct AwardBadgeView: View {
 }
 
 #Preview {
-    AwardBadgeView(
+    AchievementBadgeView(
         achievement: Achievement.allAchievements[0],
         isEarned: true,
-        progress: 0.7
+        progress: 0.75
     )
-    .padding()
-    .background(Color.gray.opacity(0.1))
 } 
