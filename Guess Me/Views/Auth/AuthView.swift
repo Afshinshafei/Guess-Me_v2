@@ -1,6 +1,8 @@
 import SwiftUI
 import Combine
 import FirebaseAuth
+import GoogleSignIn
+import UIKit
 
 struct AuthView: View {
     @State private var isSigningUp = false
@@ -99,6 +101,7 @@ struct SignInView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var isLoading = false
+    @State private var isGoogleSignInLoading = false
     @Binding var isSigningUp: Bool
     @EnvironmentObject var authService: AuthenticationService
     
@@ -182,6 +185,47 @@ struct SignInView: View {
             .disabled(email.isEmpty || password.isEmpty || isLoading)
             .padding(.top, 10)
             
+            // Divider with "OR" text
+            HStack {
+                VStack { Divider().background(AppTheme.textSecondary.opacity(0.5)) }
+                Text("OR")
+                    .font(AppTheme.caption())
+                    .foregroundColor(AppTheme.textSecondary)
+                    .padding(.horizontal, 8)
+                VStack { Divider().background(AppTheme.textSecondary.opacity(0.5)) }
+            }
+            .padding(.vertical, 8)
+            
+            // Google Sign-In Button
+            Button(action: signInWithGoogle) {
+                HStack {
+                    if isGoogleSignInLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .tint(AppTheme.textPrimary)
+                    } else {
+                        Image("google_logo") // Make sure to add this image to your assets
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                            .padding(.trailing, 8)
+                        
+                        Text("Sign in with Google")
+                            .font(.system(.body, design: .rounded, weight: .medium))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(AppTheme.textSecondary.opacity(0.3), lineWidth: 1)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                )
+                .foregroundColor(AppTheme.textPrimary)
+                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+            }
+            .disabled(isGoogleSignInLoading)
+            
             Button(action: {
                 withAnimation {
                     isSigningUp = true
@@ -211,6 +255,30 @@ struct SignInView: View {
             }
             .store(in: &authService.cancellables)
     }
+    
+    private func signInWithGoogle() {
+        isGoogleSignInLoading = true
+        
+        // Get the root view controller
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            isGoogleSignInLoading = false
+            return
+        }
+        
+        authService.signInWithGoogle(presenting: rootViewController)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                isGoogleSignInLoading = false
+                
+                if case .failure(let error) = completion {
+                    print("Error signing in with Google: \(error)")
+                }
+            } receiveValue: { _ in
+                // Successfully signed in, the auth state listener will handle the transition
+            }
+            .store(in: &authService.cancellables)
+    }
 }
 
 struct SignUpView: View {
@@ -219,6 +287,7 @@ struct SignUpView: View {
     @State private var confirmPassword = ""
     @State private var username = ""
     @State private var isLoading = false
+    @State private var isGoogleSignInLoading = false
     @State private var signupSuccess = false
     @Binding var isSigningUp: Bool
     @EnvironmentObject var authService: AuthenticationService
@@ -386,6 +455,47 @@ struct SignUpView: View {
                 .disabled(!isFormValid || isLoading)
                 .padding(.top, 5)
                 
+                // Divider with "OR" text
+                HStack {
+                    VStack { Divider().background(AppTheme.textSecondary.opacity(0.5)) }
+                    Text("OR")
+                        .font(AppTheme.caption())
+                        .foregroundColor(AppTheme.textSecondary)
+                        .padding(.horizontal, 8)
+                    VStack { Divider().background(AppTheme.textSecondary.opacity(0.5)) }
+                }
+                .padding(.vertical, 8)
+                
+                // Google Sign-Up Button
+                Button(action: signUpWithGoogle) {
+                    HStack {
+                        if isGoogleSignInLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .tint(AppTheme.textPrimary)
+                        } else {
+                            Image("google_logo") // Make sure to add this image to your assets
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .padding(.trailing, 8)
+                            
+                            Text("Continue with Google")
+                                .font(.system(.body, design: .rounded, weight: .medium))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppTheme.textSecondary.opacity(0.3), lineWidth: 1)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                    )
+                    .foregroundColor(AppTheme.textPrimary)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                }
+                .disabled(isGoogleSignInLoading)
+                
                 Button(action: {
                     withAnimation {
                         isSigningUp = false
@@ -422,6 +532,31 @@ struct SignUpView: View {
                 }
             } receiveValue: { _ in
                 // No additional action needed here, handled in completion
+            }
+            .store(in: &authService.cancellables)
+    }
+    
+    private func signUpWithGoogle() {
+        isGoogleSignInLoading = true
+        
+        // Get the root view controller
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            isGoogleSignInLoading = false
+            return
+        }
+        
+        authService.signInWithGoogle(presenting: rootViewController)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                isGoogleSignInLoading = false
+                
+                if case .failure(let error) = completion {
+                    print("Error signing up with Google: \(error)")
+                }
+            } receiveValue: { _ in
+                // Successfully signed in with Google
+                // The auth state listener will handle the transition
             }
             .store(in: &authService.cancellables)
     }

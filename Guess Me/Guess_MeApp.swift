@@ -10,6 +10,7 @@ import Firebase
 import GoogleMobileAds
 import FirebaseFirestore
 import Combine
+import GoogleSignIn
 
 @main
 struct Guess_MeApp: App {
@@ -126,6 +127,11 @@ struct Guess_MeApp: App {
                         }
                         .store(in: &navigationCoordinator.cancellables)
                 }
+            }
+            // Handle incoming URLs for Google Sign-In authentication
+            .onOpenURL { url in
+                print("DEBUG: Received URL: \(url.absoluteString)")
+                GIDSignIn.sharedInstance.handle(url)
             }
         }
     }

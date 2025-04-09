@@ -1,6 +1,8 @@
 import Foundation
 import FirebaseAuth
 import Combine
+import GoogleSignIn
+import FirebaseCore
 
 class AuthenticationService: ObservableObject {
     @Published var user: User?
@@ -166,6 +168,86 @@ class AuthenticationService: ObservableObject {
                 promise(.failure(error))
             }
         }.eraseToAnyPublisher()
+    }
+    
+    func signInWithGoogle(presenting viewController: UIViewController) -> AnyPublisher<Void, Error> {
+        return Future<Void, Error> { [weak self] promise in
+            guard let clientID = FirebaseApp.app()?.options.clientID else {
+                let error = NSError(domain: "AuthenticationService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase configuration error"])
+                promise(.failure(error))
+                return
+            }
+            
+            // Create Google Sign In configuration object
+            let config = GIDConfiguration(clientID: clientID)
+            GIDSignIn.sharedInstance.configuration = config
+            
+            // Start the sign in flow
+            GIDSignIn.sharedInstance.signIn(withPresenting: viewController) { [weak self] result, error in
+                if let error = error {
+                    print("DEBUG: Google Sign-In error: \(error)")
+                    promise(.failure(error))
+                    self?.errorMessage = error.localizedDescription
+                    return
+                }
+                
+                guard let user = result?.user,
+                      let idToken = user.idToken?.tokenString else {
+                    let error = NSError(domain: "AuthenticationService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Google Sign-In missing token"])
+                    promise(.failure(error))
+                    self?.errorMessage = "Authentication failed"
+                    return
+                }
+                
+                // Create Google credential
+                let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: user.accessToken.tokenString)
+                
+                // Sign in with Firebase
+                Auth.auth().signIn(with: credential) { authResult, error in
+                    if let error = error {
+                        print("DEBUG: Firebase Auth with Google error: \(error)")
+                        promise(.failure(error))
+                        self?.errorMessage = error.localizedDescription
+                        return
+                    }
+                    
+                    // Check if this is a new user
+                    let isNewUser = authResult?.additionalUserInfo?.isNewUser ?? false
+                    
+                    if isNewUser {
+                        // Create new user in Firestore
+                        guard let firebaseUser = authResult?.user else {
+                            promise(.success(()))
+                            return
+                        }
+                        
+                        // Use display name from Google or email prefix as username
+                        let username = firebaseUser.displayName ?? firebaseUser.email?.components(separatedBy: "@").first ?? "User"
+                        let email = firebaseUser.email ?? ""
+                        let photoURL = firebaseUser.photoURL?.absoluteString
+                        
+                        let newUser = User(id: firebaseUser.uid, 
+                                          username: username, 
+                                          email: email,
+                                          profileImageURL: photoURL)
+                        
+                        UserService.shared.createUser(newUser)
+                            .sink(receiveCompletion: { completion in
+                                if case .failure(let error) = completion {
+                                    print("DEBUG: Error creating Google user in Firestore: \(error)")
+                                } else {
+                                    print("DEBUG: Google user successfully created in Firestore")
+                                }
+                                promise(.success(()))
+                            }, receiveValue: { _ in })
+                            .store(in: &self!.cancellables)
+                    } else {
+                        promise(.success(()))
+                    }
+                }
+            }
+        }
+        .eraseToAnyPublisher()
     }
     
     deinit {

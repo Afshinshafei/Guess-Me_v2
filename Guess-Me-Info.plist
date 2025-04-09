@@ -7,6 +7,10 @@
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.126761954957-t5tpneld1kjkas0turk6rpch73hsl8vm</string>
+			</array>
 		</dict>
 		<dict>
 			<key>CFBundleTypeRole</key>
