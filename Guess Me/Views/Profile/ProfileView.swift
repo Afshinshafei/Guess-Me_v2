@@ -105,19 +105,33 @@ class ProfileViewModel: ObservableObject, Sendable {
                 // Refresh user data
                 if let userId = user.id {
                     print("Refreshing user data after save")
-                    UserService.shared.fetchUser(withUID: userId)
-                        .receive(on: DispatchQueue.main)
-                        .sink(receiveCompletion: { completion in
-                            if case .failure(let error) = completion {
-                                print("Error refreshing user data: \(error)")
-                                self.errorMessage = "Failed to refresh data: \(error.localizedDescription)"
-                                self.showError = true
+                    Task {
+                        do {
+                            // Convert UserService's publisher-based API to async/await
+                            let updatedUser = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<User, Error>) in
+                                var cancellables = Set<AnyCancellable>()
+                                UserService.shared.fetchUser(withUID: userId)
+                                    .sink { completion in
+                                        if case .failure(let error) = completion {
+                                            continuation.resume(throwing: error)
+                                        }
+                                        // Success already handled in receiveValue
+                                    } receiveValue: { user in
+                                        continuation.resume(returning: user)
+                                    }
+                                    .store(in: &cancellables)
                             }
-                        }, receiveValue: { user in
-                            print("User data refreshed: \(user.username)")
-                            self.authService.user = user
-                        })
-                        .store(in: &self.cancellables)
+                            
+                            await MainActor.run {
+                                self.authService.user = updatedUser
+                                self.isLoading = false
+                            }
+                        } catch {
+                            print("Error refreshing user data: \(error)")
+                            self.errorMessage = "Failed to refresh data: \(error.localizedDescription)"
+                            self.showError = true
+                        }
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -153,12 +167,17 @@ class ProfileViewModel: ObservableObject, Sendable {
     
     func processSelectedPhoto() {
         Task {
+            print("DEBUG: ProfileViewModel - Processing selected photo")
             if let selectedPhotoItem = selectedPhotoItem,
                let data = try? await selectedPhotoItem.loadTransferable(type: Data.self),
                let uiImage = UIImage(data: data) {
+                print("DEBUG: ProfileViewModel - Photo loaded successfully, size: \(uiImage.size)")
                 DispatchQueue.main.async {
                     self.selectedImage = uiImage
+                    print("DEBUG: ProfileViewModel - selectedImage updated")
                 }
+            } else {
+                print("ERROR: ProfileViewModel - Failed to load selected photo")
             }
         }
     }
@@ -167,17 +186,35 @@ class ProfileViewModel: ObservableObject, Sendable {
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var gameManager: GameManager
+    
+    // Sheet presentation state
+    enum SheetType: Identifiable {
+        case photoPicker
+        case imageCrop
+        case achievements
+        case editProfile
+        
+        var id: Int {
+            switch self {
+            case .photoPicker: return 0
+            case .imageCrop: return 1
+            case .achievements: return 2
+            case .editProfile: return 3
+            }
+        }
+    }
+    
+    @State private var activeSheet: SheetType?
     @State private var isEditing = false
-    @State private var showingImagePicker = false
     @State private var showingLogoutAlert = false
     @State private var editedUsername = ""
     @State private var selectedImage: UIImage?
     @State private var isLoading = false
-    @State private var isShowingAchievements = false
     @State private var animateBackground = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showAllAchievements = false
-    @State private var showingEditProfile = false
+    @State private var originalImage: UIImage?
+    @State private var showPhotosPicker = false
     
     private var earnedCount: Int {
         authService.user?.achievements.count ?? 0
@@ -185,6 +222,87 @@ struct ProfileView: View {
     
     private var totalCount: Int {
         Achievement.allAchievements.count
+    }
+    
+    private func uploadProfileImage(_ image: UIImage) {
+        guard let user = authService.user, let userId = user.id else { 
+            print("ERROR: Cannot upload profile image - user or userId is nil")
+            return 
+        }
+        
+        // Show loading overlay
+        isLoading = true
+        print("DEBUG: Starting profile image upload for user \(userId)")
+        
+        Task {
+            do {
+                // Convert StorageService's publisher-based API to async/await
+                print("DEBUG: Uploading image to Firebase Storage")
+                let uploadTask = StorageService.shared.uploadProfileImage(image, userId: userId)
+                    .flatMap { url -> AnyPublisher<Void, Error> in
+                        print("DEBUG: Image uploaded successfully, URL: \(url)")
+                        var updatedUser = user
+                        updatedUser.profileImageURL = url.absoluteString
+                        return UserService.shared.updateUser(updatedUser)
+                    }
+                
+                // Create a continuation to bridge the publisher to async/await
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    var cancellables = Set<AnyCancellable>()
+                    uploadTask
+                        .sink { completion in
+                            switch completion {
+                            case .finished:
+                                print("DEBUG: User document updated with new profile URL")
+                                continuation.resume()
+                            case .failure(let error):
+                                print("ERROR: Failed to upload image or update user: \(error)")
+                                continuation.resume(throwing: error)
+                            }
+                        } receiveValue: { _ in
+                            // Success already handled in completion
+                        }
+                        .store(in: &cancellables)
+                }
+                
+                // Success - now fetch the updated user
+                if let userId = user.id {
+                    print("DEBUG: Fetching updated user data")
+                    // Convert UserService's publisher-based API to async/await
+                    let updatedUser = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<User, Error>) in
+                        var cancellables = Set<AnyCancellable>()
+                        UserService.shared.fetchUser(withUID: userId)
+                            .sink { completion in
+                                if case .failure(let error) = completion {
+                                    print("ERROR: Failed to fetch updated user: \(error)")
+                                    continuation.resume(throwing: error)
+                                }
+                                // Success handled in receiveValue
+                            } receiveValue: { user in
+                                print("DEBUG: Successfully fetched updated user data")
+                                continuation.resume(returning: user)
+                            }
+                            .store(in: &cancellables)
+                    }
+                    
+                    await MainActor.run {
+                        print("DEBUG: Updating UI with new profile data")
+                        self.authService.user = updatedUser
+                        self.isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        print("ERROR: User ID is nil after upload")
+                        self.isLoading = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    print("ERROR: Profile update failed: \(error.localizedDescription)")
+                    self.isLoading = false
+                }
+            }
+        }
     }
     
     var body: some View {
@@ -224,7 +342,7 @@ struct ProfileView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: {
-                            showingEditProfile = true
+                            activeSheet = .editProfile
                         }) {
                             Text("Edit Profile")
                                 .font(AppTheme.body())
@@ -250,27 +368,50 @@ struct ProfileView: View {
                         )
                 }
             }
-            .sheet(isPresented: $showingImagePicker) {
-                PhotosPicker("Select Photo", selection: $selectedPhotoItem, matching: .images)
-                    .onChange(of: selectedPhotoItem) { oldValue, newValue in
-                        if let newValue {
-                            Task {
-                                if let data = try? await newValue.loadTransferable(type: Data.self),
-                                   let image = UIImage(data: data) {
-                                    DispatchQueue.main.async {
-                                        self.selectedImage = image
-                                    }
-                                }
+            .photosPicker(isPresented: $showPhotosPicker, selection: $selectedPhotoItem, matching: .images)
+            .onChange(of: selectedPhotoItem) { _, newValue in
+                if let newValue = newValue {
+                    print("DEBUG: ProfileView - PhotoItem selected, loading image data")
+                    Task {
+                        if let data = try? await newValue.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            print("DEBUG: ProfileView - Image loaded successfully, size: \(image.size)")
+                            DispatchQueue.main.async {
+                                self.originalImage = image
+                                self.activeSheet = .imageCrop
+                                self.selectedPhotoItem = nil // Reset picker selection
+                                print("DEBUG: ProfileView - Presenting ImageCropView")
                             }
+                        } else {
+                            print("ERROR: ProfileView - Failed to load image data")
                         }
                     }
+                }
             }
-            .sheet(isPresented: $isShowingAchievements) {
-                AchievementsView()
-            }
-            .sheet(isPresented: $showingEditProfile) {
-                ProfileEditView()
-                    .environmentObject(authService)
+            .sheet(item: $activeSheet) { sheetType in
+                switch sheetType {
+                case .photoPicker:
+                    // This won't be used anymore
+                    Text("Select Photo")
+                        .onAppear {
+                            // Immediately transition to the native picker
+                            activeSheet = nil
+                            showPhotosPicker = true
+                        }
+                case .imageCrop:
+                    if let originalImage = originalImage {
+                        ImageCropView(sourceImage: originalImage) { croppedImage in
+                            self.selectedImage = croppedImage
+                            self.activeSheet = nil
+                        }
+                        .interactiveDismissDisabled() // Prevent dismissing by swiping down
+                    }
+                case .achievements:
+                    AchievementsView()
+                case .editProfile:
+                    ProfileEditView()
+                        .environmentObject(authService)
+                }
             }
             .alert(isPresented: $showingLogoutAlert) {
                 Alert(
@@ -316,20 +457,7 @@ struct ProfileView: View {
                         .profileImageStyle(size: 160)
                 }
                 
-                Button(action: {
-                    showingImagePicker = true
-                }) {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Circle()
-                                .fill(AppTheme.primary)
-                                .shadow(color: AppTheme.primary.opacity(0.3), radius: 4, x: 0, y: 2)
-                        )
-                }
-                .buttonStyle(ScaleButtonStyle())
+                // Camera button removed
             }
             .padding(.bottom, 8)
             
@@ -363,7 +491,7 @@ struct ProfileView: View {
                 Spacer()
                 
                 Button(action: {
-                    isShowingAchievements = true
+                    activeSheet = .achievements
                 }) {
                     Text("See All")
                         .font(AppTheme.caption())
@@ -421,7 +549,7 @@ struct ProfileView: View {
                         .lineLimit(2)
                     
                     Button(action: {
-                        isShowingAchievements = true
+                        activeSheet = .achievements
                     }) {
                         Text("View All Awards")
                             .font(AppTheme.caption())
@@ -653,17 +781,6 @@ struct ProfileView: View {
         let accuracy = Double(user.correctGuesses) / Double(user.totalGuesses) * 100
         return String(format: "%.1f%%", accuracy)
     }
-    
-    private func uploadProfileImage(_ image: UIImage) {
-        isLoading = true
-        
-        // In a real app, this would call the appropriate service to upload the image
-        // For now, simulate a delay and success
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            isLoading = false
-            // In a real implementation, you'd update the user profile with the new image URL
-        }
-    }
 }
 
 struct StatItem: View {
@@ -860,8 +977,24 @@ struct ProfileEditView: View {
     @StateObject private var viewModel: ProfileSetupViewModel
     @State private var animateBackground = false
     
+    // Sheet presentation state
+    enum SheetType: Identifiable {
+        case photoPicker
+        case imageCrop
+        
+        var id: Int {
+            switch self {
+            case .photoPicker: return 0
+            case .imageCrop: return 1
+            }
+        }
+    }
+    
+    @State private var activeSheet: SheetType?
+    @State private var showPhotosPicker = false
+    
     init() {
-        // Initialize with the current auth service
+        // Use a temporary AuthenticationService for preview
         _viewModel = StateObject(wrappedValue: ProfileSetupViewModel(authService: AuthenticationService()))
     }
     
@@ -901,6 +1034,108 @@ struct ProfileEditView: View {
                                 .padding(.bottom, 5)
                         }
                         .padding(.top, 10)
+                        
+                        // Profile Photo Section
+                        VStack(spacing: 20) {
+                            Text("Profile Photo")
+                                .font(AppTheme.heading())
+                                .foregroundColor(AppTheme.textOnDark)
+                            
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [AppTheme.primary.opacity(0.2), AppTheme.secondary.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 150, height: 150)
+                                
+                                if let selectedImage = viewModel.selectedImage {
+                                    Image(uiImage: selectedImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 140, height: 140)
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle()
+                                                .stroke(
+                                                    LinearGradient(
+                                                        colors: [AppTheme.primary, AppTheme.secondary],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 3
+                                                )
+                                        )
+                                } else if let profileImageURL = authService.user?.profileImageURL, !profileImageURL.isEmpty {
+                                    AsyncImage(url: URL(string: profileImageURL)) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            ProgressView()
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 140, height: 140)
+                                                .clipShape(Circle())
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(
+                                                            LinearGradient(
+                                                                colors: [AppTheme.primary, AppTheme.secondary],
+                                                                startPoint: .topLeading,
+                                                                endPoint: .bottomTrailing
+                                                            ),
+                                                            lineWidth: 3
+                                                        )
+                                                )
+                                        case .failure:
+                                            Image(systemName: "person.fill")
+                                                .font(.system(size: 60))
+                                                .foregroundColor(AppTheme.textSecondary)
+                                                .frame(width: 140, height: 140)
+                                                .background(AppTheme.cardBackground.opacity(0.3))
+                                                .clipShape(Circle())
+                                        @unknown default:
+                                            EmptyView()
+                                        }
+                                    }
+                                } else {
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 60))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                        .frame(width: 140, height: 140)
+                                        .background(AppTheme.cardBackground.opacity(0.3))
+                                        .clipShape(Circle())
+                                }
+                                
+                                Button(action: {
+                                    showPhotosPicker = true
+                                }) {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.white)
+                                        .frame(width: 36, height: 36)
+                                        .background(
+                                            Circle()
+                                                .fill(AppTheme.primary)
+                                                .shadow(color: AppTheme.primary.opacity(0.3), radius: 4, x: 0, y: 2)
+                                        )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                                .offset(x: 50, y: 50)
+                            }
+                            .padding(.bottom, 10)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(AppTheme.cardBackground.opacity(0.8))
+                                .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+                        )
+                        .padding(.horizontal, 20)
                         
                         // Content container
                         VStack(spacing: 25) {
@@ -958,10 +1193,42 @@ struct ProfileEditView: View {
                 viewModel.authService = authService
                 viewModel.loadUserDataFromService()
             }
+            .photosPicker(isPresented: $showPhotosPicker, selection: $viewModel.selectedPhotoItem, matching: .images)
+            .sheet(item: $activeSheet) { sheetType in
+                switch sheetType {
+                case .photoPicker:
+                    // This won't be used anymore
+                    Text("Select Photo")
+                        .onAppear {
+                            // Immediately transition to the native picker
+                            activeSheet = nil
+                            showPhotosPicker = true
+                        }
+                case .imageCrop:
+                    if let originalImage = viewModel.originalImage {
+                        ImageCropView(sourceImage: originalImage) { croppedImage in
+                            viewModel.selectedImage = croppedImage
+                            activeSheet = nil
+                        }
+                        .interactiveDismissDisabled() // Prevent dismissing by swiping down
+                    }
+                }
+            }
             .onReceive(authService.$user) { user in
                 // Update if user changes
                 if user != nil {
                     viewModel.loadUserDataFromService()
+                }
+            }
+            .onChange(of: viewModel.selectedPhotoItem) { oldValue, newValue in
+                if newValue != nil {
+                    viewModel.processSelectedPhoto()
+                }
+            }
+            .onChange(of: viewModel.showImageCropView) { oldValue, newValue in
+                if newValue {
+                    activeSheet = .imageCrop
+                    viewModel.showImageCropView = false  // Reset the flag
                 }
             }
             .alert(isPresented: $viewModel.showError) {
@@ -1259,11 +1526,17 @@ struct ProfileEditView: View {
     
     private func saveProfile() async {
         do {
+            print("DEBUG: ProfileEditView - Starting profile save")
+            if viewModel.selectedImage != nil {
+                print("DEBUG: ProfileEditView - New profile image selected, will be uploaded")
+            }
+            
             // Call the viewModel's saveProfile method
             try await viewModel.saveProfile()
+            print("DEBUG: ProfileEditView - Profile saved successfully")
             dismiss()
         } catch {
-            print("Error saving profile: \(error)")
+            print("ERROR: ProfileEditView - Error saving profile: \(error)")
             viewModel.errorMessage = "Failed to save profile: \(error.localizedDescription)"
             viewModel.showError = true
         }

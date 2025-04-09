@@ -19,6 +19,8 @@ final class ProfileSetupViewModel: ObservableObject, Sendable {
     @Published var favoriteHobby = ""
     @Published var selectedPhotoItem: PhotosPickerItem?
     @Published var selectedImage: UIImage?
+    @Published var originalImage: UIImage?
+    @Published var showImageCropView = false
     @Published var isLoading = false
     @Published var loadingMessage = "Saving your profile..."
     @Published var currentStep = 0
@@ -104,7 +106,8 @@ final class ProfileSetupViewModel: ObservableObject, Sendable {
                let data = try? await selectedPhotoItem.loadTransferable(type: Data.self),
                let uiImage = UIImage(data: data) {
                 DispatchQueue.main.async {
-                    self.selectedImage = uiImage
+                    self.originalImage = uiImage
+                    self.showImageCropView = true
                 }
             }
         }
@@ -268,6 +271,19 @@ struct ProfileSetupView: View {
     @EnvironmentObject var navigationCoordinator: NavigationCoordinator
     @StateObject private var viewModel: ProfileSetupViewModel
     @State private var animateBackground = false
+    
+    // Sheet presentation state
+    enum SheetType: Identifiable {
+        case imageCrop
+        
+        var id: Int {
+            switch self {
+            case .imageCrop: return 0
+            }
+        }
+    }
+    
+    @State private var activeSheet: SheetType?
     
     // Add a dismiss environment key
     @Environment(\.dismiss) private var dismiss
@@ -479,7 +495,26 @@ struct ProfileSetupView: View {
             }
         }
         .onChange(of: viewModel.selectedPhotoItem) { oldValue, newValue in
-            viewModel.processSelectedPhoto()
+            if newValue != nil {
+                viewModel.processSelectedPhoto()
+            }
+        }
+        .onChange(of: viewModel.showImageCropView) { oldValue, newValue in
+            if newValue {
+                activeSheet = .imageCrop
+                viewModel.showImageCropView = false  // Reset the flag
+            }
+        }
+        .sheet(item: $activeSheet) { sheetType in
+            switch sheetType {
+            case .imageCrop:
+                if let originalImage = viewModel.originalImage {
+                    ImageCropView(sourceImage: originalImage) { croppedImage in
+                        viewModel.selectedImage = croppedImage
+                        activeSheet = nil
+                    }
+                }
+            }
         }
         .alert(isPresented: $viewModel.showError) {
             Alert(
@@ -865,9 +900,6 @@ struct ProfileSetupView: View {
                 .foregroundColor(AppTheme.textOnDark)
             }
             .buttonStyle(ScaleButtonStyle())
-            .onChange(of: viewModel.selectedPhotoItem) { oldValue, newValue in
-                viewModel.processSelectedPhoto()
-            }
         }
     }
     
