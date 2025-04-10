@@ -140,7 +140,12 @@ class QuestionManager {
         let commonOccupations = [
             "Teacher", "Doctor", "Engineer", "Lawyer", "Artist",
             "Designer", "Chef", "Accountant", "Scientist", "Writer",
-            "Programmer", "Manager", "Entrepreneur", "Nurse", "Technician"
+            "Programmer", "Manager", "Entrepreneur", "Nurse", "Technician",
+            "Architect", "Photographer", "Musician", "Marketing Specialist", "Financial Analyst",
+            "Social Worker", "Psychologist", "Personal Trainer", "Police Officer", "Firefighter",
+            "Pilot", "Flight Attendant", "Real Estate Agent", "Electrician", "Plumber",
+            "Construction Worker", "Dentist", "Veterinarian", "Pharmacist", "Actor",
+            "Journalist", "Translator", "HR Manager", "Data Scientist", "UX Designer"
         ]
         
         var occupationOptions = [actualOccupation]
@@ -171,7 +176,11 @@ class QuestionManager {
         // Common education levels
         let educationLevels = [
             "High School", "Associate's Degree", "Bachelor's Degree",
-            "Master's Degree", "PhD", "Trade School", "Self-taught"
+            "Master's Degree", "PhD", "Trade School", "Self-taught",
+            "Some College", "Professional Certificate", "MBA",
+            "Medical Degree", "Law Degree", "Technical Diploma",
+            "Vocational Training", "Online Courses", "Doctorate",
+            "Post-Graduate Certificate", "No Formal Education"
         ]
         
         var educationOptions = [actualEducation]
@@ -276,7 +285,10 @@ class QuestionManager {
         
         let commonColors = [
             "Red", "Blue", "Green", "Yellow", "Purple", "Orange",
-            "Pink", "Black", "White", "Brown", "Gray", "Teal"
+            "Pink", "Black", "White", "Brown", "Gray", "Teal",
+            "Navy", "Turquoise", "Lavender", "Maroon", "Gold", "Silver", 
+            "Coral", "Mint", "Olive", "Peach", "Cyan", "Indigo", 
+            "Magenta", "Burgundy", "Beige", "Crimson", "Tan", "Forest Green"
         ]
         
         var colorOptions = [actualColor]
@@ -307,7 +319,14 @@ class QuestionManager {
         let popularMovies = [
             "The Shawshank Redemption", "The Godfather", "The Dark Knight",
             "Pulp Fiction", "Forrest Gump", "Inception", "The Matrix",
-            "Goodfellas", "The Lord of the Rings", "Star Wars"
+            "Goodfellas", "The Lord of the Rings", "Star Wars",
+            "Titanic", "Avatar", "Jurassic Park", "The Lion King",
+            "Fight Club", "Gladiator", "Spider-Man", "The Avengers",
+            "Harry Potter", "Interstellar", "Casablanca", "ET",
+            "Back to the Future", "Finding Nemo", "Toy Story",
+            "The Silence of the Lambs", "The Departed", "Jaws",
+            "The Notebook", "Princess Bride", "Black Panther",
+            "La La Land", "Gone with the Wind", "The Breakfast Club"
         ]
         
         var movieOptions = [actualMovie]
@@ -337,7 +356,12 @@ class QuestionManager {
         
         let commonFoods = [
             "Pizza", "Sushi", "Burger", "Pasta", "Tacos",
-            "Salad", "Steak", "Curry", "Ramen", "Sandwich"
+            "Salad", "Steak", "Curry", "Ramen", "Sandwich",
+            "Ice Cream", "Chocolate", "Lasagna", "Fried Chicken", "Pho",
+            "BBQ Ribs", "Seafood", "Dim Sum", "Burrito", "Pad Thai",
+            "Biryani", "Paella", "Falafel", "Mac and Cheese", "Hot Pot",
+            "Dumplings", "Nachos", "Gyros", "Shawarma", "Butter Chicken",
+            "Lobster", "Cheesecake", "Croissant", "Kebab", "Risotto"
         ]
         
         var foodOptions = [actualFood]
@@ -367,7 +391,11 @@ class QuestionManager {
         
         let commonFlowers = [
             "Rose", "Tulip", "Sunflower", "Lily", "Orchid",
-            "Daisy", "Daffodil", "Iris", "Chrysanthemum", "Peony"
+            "Daisy", "Daffodil", "Iris", "Chrysanthemum", "Peony",
+            "Carnation", "Hydrangea", "Dahlia", "Lavender", "Cherry Blossom",
+            "Magnolia", "Poppy", "Hibiscus", "Lotus", "Jasmine",
+            "Marigold", "Violet", "Begonia", "Azalea", "Cactus",
+            "Snapdragon", "Geranium", "Gardenia", "Camellia", "Plumeria"
         ]
         
         var flowerOptions = [actualFlower]
@@ -397,7 +425,12 @@ class QuestionManager {
         
         let commonSports = [
             "Football", "Basketball", "Tennis", "Soccer", "Baseball",
-            "Golf", "Swimming", "Volleyball", "Cricket", "Rugby"
+            "Golf", "Swimming", "Volleyball", "Cricket", "Rugby",
+            "Badminton", "Hockey", "Boxing", "Surfing", "Skiing",
+            "Snowboarding", "Gymnastics", "MMA", "Track & Field", "Cycling",
+            "Table Tennis", "Karate", "Wrestling", "Rowing", "Archery",
+            "Skateboarding", "Martial Arts", "Bowling", "Figure Skating", "Climbing",
+            "Horse Riding", "Sailing", "Handball", "Fencing", "Lacrosse"
         ]
         
         var sportOptions = [actualSport]
@@ -427,7 +460,13 @@ class QuestionManager {
         
         let commonHobbies = [
             "Reading", "Gaming", "Photography", "Painting", "Gardening",
-            "Cooking", "Traveling", "Music", "Writing", "Hiking"
+            "Cooking", "Traveling", "Music", "Writing", "Hiking",
+            "Dancing", "Yoga", "Fishing", "Knitting", "Woodworking",
+            "Chess", "Pottery", "Baking", "Camping", "Collecting",
+            "Bird Watching", "Meditation", "DIY Projects", "Crafting", "Running",
+            "Cycling", "Swimming", "Playing Instruments", "Film Making", "Archery",
+            "Rock Climbing", "Surfing", "Skiing", "Astronomy", "Blogging",
+            "Geocaching", "Model Building", "Brewing", "Sewing", "Theater"
         ]
         
         var hobbyOptions = [actualHobby]

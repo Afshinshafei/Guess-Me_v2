@@ -8,32 +8,38 @@ struct TutorialView: View {
     // Tutorial slides data
     private let slides = [
         TutorialSlide(
-            title: "Welcome to GuessMe!",
-            description: "GuessMe is a social guessing game where you can learn about others and let others guess about you.",
+            title: "Welcome to MugMatch! 🎮",
+            description: "Ready for a wild ride? Discover just how mysterious you really are! Let the mind-reading begin! 🧠✨",
             imageName: "person.fill.questionmark",
             backgroundColor: AppTheme.primary
         ),
         TutorialSlide(
-            title: "How It Works",
-            description: "Create your profile, add your traits, and let others guess about you. You'll also get to guess about others!",
+            title: "How It Works 🤔",
+            description: "Create your profile, add your quirky traits, and watch friends guess about you! Plus, you get to play detective too! 🕵️‍♀️",
             imageName: "person.2.fill",
             backgroundColor: AppTheme.tertiary
         ),
         TutorialSlide(
-            title: "Your Profile",
-            description: "Set up your profile with basic information, photos, and traits. The more accurate your profile, the more fun the game becomes!",
+            title: "Your Profile 🌟",
+            description: "Time to shine! Add your pics and traits. The more authentic your profile, the more fun the guesses will be!",
             imageName: "person.crop.circle.badge.checkmark",
             backgroundColor: AppTheme.secondary
         ),
         TutorialSlide(
-            title: "Guessing Game",
-            description: "Browse profiles, make guesses about others, and see how well you know people based on their photos and traits.",
+            title: "Guessing Game 🎯",
+            description: "Browse profiles, make wild guesses, and see if you're psychic or hilariously clueless! Are you the ultimate people-reader?",
             imageName: "questionmark.circle.fill",
             backgroundColor: AppTheme.accent
         ),
         TutorialSlide(
-            title: "Ready to Start?",
-            description: "Let's set up your profile and begin your GuessMe journey!",
+            title: "Stay Safe & Awesome 🛡️",
+            description: "Keep it clean! Upload appropriate photos and be respectful. Together we'll create a positive community for everyone.",
+            imageName: "shield.fill",
+            backgroundColor: AppTheme.tertiary
+        ),
+        TutorialSlide(
+            title: "Ready to Rock? 🚀",
+            description: "Let's set up your profile and dive into the wacky world of MugMatch! Your friends won't know what hit them!",
             imageName: "arrow.right.circle.fill",
             backgroundColor: AppTheme.primary
         )
@@ -198,22 +204,22 @@ struct TutorialSlideView: View {
     @State private var isAnimating = false
     
     var body: some View {
-        VStack(spacing: 30) {
+        VStack(spacing: 20) {
             // Image area
             ZStack {
                 Circle()
                     .fill(AppTheme.textOnDark.opacity(0.15))
-                    .frame(width: 180, height: 180)
+                    .frame(width: 160, height: 160)
                 
                 Image(systemName: slide.imageName)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 100, height: 100)
+                    .frame(width: 90, height: 90)
                     .foregroundColor(AppTheme.textOnDark)
                     .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     .scaleEffect(isAnimating ? 1.1 : 1.0)
             }
-            .padding()
+            .padding(.top)
             .onAppear {
                 withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                     isAnimating = true
@@ -221,7 +227,7 @@ struct TutorialSlideView: View {
             }
             
             // Text content
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 Text(slide.title)
                     .font(AppTheme.heading())
                     .foregroundColor(AppTheme.textOnDark)
@@ -232,17 +238,19 @@ struct TutorialSlideView: View {
                     .font(AppTheme.body())
                     .multilineTextAlignment(.center)
                     .foregroundColor(AppTheme.textOnDark.opacity(0.9))
-                    .padding(.horizontal, 30)
+                    .padding(.horizontal, 20)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.bottom, 10)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 30)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 30)
                 .fill(slide.backgroundColor.opacity(0.2))
                 .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
 }
 

@@ -10,11 +10,11 @@ class AdMobManager: NSObject, ObservableObject {
     @Published var isLoading = false
     
     private var rewardedAd: RewardedAd?
-    // Use test ad unit ID for development (change this to your ad unit ID for production)
-    private let rewardedAdUnitID = "ca-app-pub-3940256099942544/1712485313" // Test Rewarded Ad Unit ID
+    // Production Rewarded Ad Unit ID for Lives Reset Reward
+    private let rewardedAdUnitID = "ca-app-pub-1651937682854848/5620357296"
     
-    // Banner ad test ID
-    let bannerAdUnitID = "ca-app-pub-3940256099942544/2435281174" // Test Banner Ad Unit ID
+    // Production Banner Ad Unit ID for home banner
+    let bannerAdUnitID = "ca-app-pub-1651937682854848/8131481318"
     
     private override init() {
         super.init()
@@ -53,7 +53,7 @@ class AdMobManager: NSObject, ObservableObject {
             self.isRewardedAdReady = true
             print("AdMobManager: Rewarded ad loaded successfully and is ready to show")
             
-            // Set up a callback for when the ad expires
+            // Set up a callback for when the ad is paid for
             ad?.paidEventHandler = { [weak self] adValue in
                 print("AdMobManager: Rewarded ad paid event: \(adValue.value) \(adValue.currencyCode)")
             }
@@ -110,7 +110,7 @@ class AdMobManager: NSObject, ObservableObject {
         bannerView.adUnitID = bannerAdUnitID
         
         let viewWidth = UIScreen.main.bounds.width
-        bannerView.adSize = adSizeFor(cgSize: CGSize(width: viewWidth, height: 50))
+        bannerView.adSize = .init(size: CGSize(width: viewWidth, height: 50), flags: 0)
         
         // Fix for iOS 15+ to get the root view controller
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,

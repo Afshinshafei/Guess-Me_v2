@@ -76,7 +76,7 @@ struct AchievementBadgeView: View {
                         .frame(width: geometry.size.width * CGFloat(progress), height: 4)
                 }
             }
-            .frame(height: 4)
+            .frame(width: 60, height: 4)
             
             // Progress text
             Text("\(Int(progress * 100))%")

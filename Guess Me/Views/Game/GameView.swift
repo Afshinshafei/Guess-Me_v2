@@ -820,6 +820,8 @@ struct NoLivesOverlayView: View {
 struct RewardedAdView: View {
     let completion: (Bool) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var loadingMessage = "Loading Ad..."
+    @State private var timeoutTimer: Timer? = nil
     
     var body: some View {
         ZStack {
@@ -827,7 +829,7 @@ struct RewardedAdView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 20) {
-                Text("Loading Ad...")
+                Text(loadingMessage)
                     .font(AppTheme.title())
                     .foregroundColor(AppTheme.textPrimary)
                 
@@ -841,20 +843,44 @@ struct RewardedAdView: View {
             }
         }
         .onAppear {
-            // Get the root view controller
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let rootViewController = windowScene.windows.first?.rootViewController {
-                
-                // Show the rewarded ad
-                AdMobManager.shared.showRewardedAd(from: rootViewController) { success in
-                    completion(success)
+            // Set a timeout timer in case the ad doesn't load
+            timeoutTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { _ in
+                loadingMessage = "Ad not available"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    completion(false)
                     dismiss()
                 }
-            } else {
-                // Fallback if we can't get the root view controller
-                completion(false)
-                dismiss()
             }
+            
+            // Force a new ad to load if not already ready
+            if !AdMobManager.shared.isRewardedAdReady {
+                AdMobManager.shared.loadRewardedAd()
+            }
+            
+            // Get the root view controller after a short delay to allow ad to load
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let rootViewController = windowScene.windows.first?.rootViewController {
+                    
+                    // Show the rewarded ad
+                    AdMobManager.shared.showRewardedAd(from: rootViewController) { success in
+                        // Cancel the timeout timer
+                        timeoutTimer?.invalidate()
+                        
+                        // Proceed with completion
+                        completion(success)
+                        dismiss()
+                    }
+                } else {
+                    // Fallback if we can't get the root view controller
+                    timeoutTimer?.invalidate()
+                    completion(false)
+                    dismiss()
+                }
+            }
+        }
+        .onDisappear {
+            timeoutTimer?.invalidate()
         }
     }
 }

@@ -387,7 +387,7 @@ struct ProfileSetupView: View {
                         VStack(spacing: 25) {
                             // Header
                             VStack(spacing: 8) {
-                                Text("Welcome to GuessMe!")
+                                Text("Welcome to MugMatch!")
                                     .font(AppTheme.title())
                                     .foregroundColor(AppTheme.textOnDark)
                                     .shadow(color: Color.black.opacity(0.1), radius: 1, x: 0, y: 1)

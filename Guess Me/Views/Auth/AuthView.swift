@@ -44,7 +44,7 @@ struct AuthView: View {
                             .foregroundColor(AppTheme.textOnDark)
                             .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
                         
-                        Text("GuessMe")
+                        Text("MugMatch")
                             .font(AppTheme.title())
                             .foregroundColor(AppTheme.textOnDark)
                             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
@@ -231,7 +231,7 @@ struct SignInView: View {
                     isSigningUp = true
                 }
             }) {
-                Text("New to GuessMe? Sign Up")
+                Text("New to MugMatch? Sign Up")
                     .font(.system(.body, design: .rounded, weight: .medium))
                     .foregroundColor(AppTheme.secondary)
                     .padding(.top, 10)
