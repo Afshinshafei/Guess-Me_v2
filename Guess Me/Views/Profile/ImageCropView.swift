@@ -8,6 +8,7 @@ struct ImageCropView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var lastOffset: CGSize = .zero
     @State private var viewSize: CGSize = .zero
+    @State private var imageSize: CGSize = .zero
     
     let sourceImage: UIImage
     let onCrop: (UIImage) -> Void
@@ -30,9 +31,13 @@ struct ImageCropView: View {
                         cropView
                             .onAppear {
                                 viewSize = geometry.size
+                                // Initialize image size and scale appropriately
+                                setupInitialImageSize()
                             }
                             .onChange(of: geometry.size) { _, newSize in
                                 viewSize = newSize
+                                // Reset position if the container size changes
+                                setupInitialImageSize()
                             }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -46,6 +51,33 @@ struct ImageCropView: View {
                 .padding()
             }
             .navigationBarHidden(true)
+        }
+    }
+    
+    private func setupInitialImageSize() {
+        // Calculate the initial size based on fitting the image within the view
+        let sourceSize = sourceImage.size
+        
+        if sourceSize.width > 0 && sourceSize.height > 0 {
+            let aspectRatio = sourceSize.width / sourceSize.height
+            
+            if viewSize.width / viewSize.height > aspectRatio {
+                imageSize = CGSize(
+                    width: viewSize.height * aspectRatio,
+                    height: viewSize.height
+                )
+            } else {
+                imageSize = CGSize(
+                    width: viewSize.width,
+                    height: viewSize.width / aspectRatio
+                )
+            }
+            
+            // Reset transformations
+            scale = 1.0
+            lastScale = 1.0
+            offset = .zero
+            lastOffset = .zero
         }
     }
     
@@ -73,7 +105,7 @@ struct ImageCropView: View {
                         MagnificationGesture()
                             .onChanged { value in
                                 let newScale = lastScale * value
-                                scale = min(max(newScale, 1.0), 3.0) // Limit scale between 1.0 and 3.0
+                                scale = min(max(newScale, 1.0), 5.0) // Limit scale between 1.0 and 5.0
                             }
                             .onEnded { value in
                                 lastScale = scale
@@ -132,87 +164,78 @@ struct ImageCropView: View {
         .padding(.horizontal)
     }
     
-    // Crop the image based on the current view state
+    // Improved crop function that correctly handles the visible portion of the image
     private func cropImage() -> UIImage {
-        print("DEBUG: ImageCropView - Starting image crop")
+        let sourceSize = sourceImage.size
         
-        // Calculate visible region of the image
-        let imageSize = sourceImage.size
-        let aspectRatio = imageSize.width / imageSize.height
-        
-        print("DEBUG: ImageCropView - Source image size: \(imageSize), aspectRatio: \(aspectRatio)")
-        print("DEBUG: ImageCropView - View size: \(viewSize), scale: \(scale), offset: \(offset)")
-        
-        // Calculate the size of the displayed image before scaling
-        var displayWidth: CGFloat = 0
-        var displayHeight: CGFloat = 0
-        
-        if viewSize.width / viewSize.height > aspectRatio {
-            // Image fits height
-            displayHeight = viewSize.height
-            displayWidth = displayHeight * aspectRatio
+        // Calculate actual displayed dimensions of the image (before scaling)
+        let displayedImageSize: CGSize
+        if viewSize.width / viewSize.height > sourceSize.width / sourceSize.height {
+            // Image height matches the container height
+            displayedImageSize = CGSize(
+                width: viewSize.height * (sourceSize.width / sourceSize.height),
+                height: viewSize.height
+            )
         } else {
-            // Image fits width
-            displayWidth = viewSize.width
-            displayHeight = displayWidth / aspectRatio
+            // Image width matches the container width
+            displayedImageSize = CGSize(
+                width: viewSize.width,
+                height: viewSize.width * (sourceSize.height / sourceSize.width)
+            )
         }
         
-        // Calculate the center of the image in the view
-        let imageCenter = CGPoint(
-            x: viewSize.width / 2 + offset.width,
-            y: viewSize.height / 2 + offset.height
+        // Calculate center position of the view
+        let viewCenter = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
+        
+        // Calculate visible region center (accounting for offset and scale)
+        let visibleCenter = CGPoint(
+            x: viewCenter.x - offset.width,
+            y: viewCenter.y - offset.height
         )
         
-        // Calculate the crop region in the original image coordinates
-        let scaledCropSize = cropSize / scale
-        
-        // Convert to pixel coordinates in the original image
-        let sourceRect = CGRect(
-            x: imageSize.width/2 - (viewSize.width/2 - imageCenter.x + cropSize/2) * imageSize.width / (displayWidth * scale),
-            y: imageSize.height/2 - (viewSize.height/2 - imageCenter.y + cropSize/2) * imageSize.height / (displayHeight * scale),
-            width: scaledCropSize * imageSize.width / displayWidth,
-            height: scaledCropSize * imageSize.height / displayHeight
+        // Calculate the crop circle position relative to the image
+        let cropCircleOnImage = CGPoint(
+            x: (visibleCenter.x - viewCenter.x) / (displayedImageSize.width * scale) * sourceSize.width + sourceSize.width / 2,
+            y: (visibleCenter.y - viewCenter.y) / (displayedImageSize.height * scale) * sourceSize.height + sourceSize.height / 2
         )
         
-        // Ensure the crop region is within the image bounds
+        // Calculate the size of the crop circle in the original image coordinates
+        let cropSizeInImageCoordinates = cropSize / scale * (sourceSize.width / displayedImageSize.width)
+        
+        // Create the crop rectangle in the original image coordinates
+        let cropRectInImage = CGRect(
+            x: cropCircleOnImage.x - cropSizeInImageCoordinates / 2,
+            y: cropCircleOnImage.y - cropSizeInImageCoordinates / 2,
+            width: cropSizeInImageCoordinates,
+            height: cropSizeInImageCoordinates
+        )
+        
+        // Ensure the crop rectangle is within the image bounds
         let safeCropRect = CGRect(
-            x: max(0, min(imageSize.width - sourceRect.width, sourceRect.minX)),
-            y: max(0, min(imageSize.height - sourceRect.height, sourceRect.minY)),
-            width: min(sourceRect.width, imageSize.width),
-            height: min(sourceRect.height, imageSize.height)
+            x: max(0, min(sourceSize.width - cropRectInImage.width, cropRectInImage.minX)),
+            y: max(0, min(sourceSize.height - cropRectInImage.height, cropRectInImage.minY)),
+            width: min(cropRectInImage.width, sourceSize.width),
+            height: min(cropRectInImage.height, sourceSize.height)
         )
         
-        print("DEBUG: ImageCropView - Calculated crop rect: \(safeCropRect)")
-        
-        // Create the cropped image
-        if let cgImage = sourceImage.cgImage?.cropping(to: safeCropRect) {
-            let croppedImage = UIImage(cgImage: cgImage, scale: sourceImage.scale, orientation: sourceImage.imageOrientation)
-            print("DEBUG: ImageCropView - Successfully cropped image with CGImage.cropping")
-            return croppedImage
-        }
-        
-        print("DEBUG: ImageCropView - Falling back to renderer-based cropping")
-        
-        // Fallback if cropping fails
+        // Create a circular cropped image
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: cropSize, height: cropSize))
-        let croppedImage = renderer.image { context in
-            // Draw a circle to create the circular crop
-            let path = UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: cropSize, height: cropSize))
-            path.addClip()
+        return renderer.image { context in
+            // Create a circular clipping path
+            let circlePath = UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: cropSize, height: cropSize))
+            circlePath.addClip()
             
-            // Calculate the correct position to draw the image
+            // Calculate the drawing rectangle to position the source image correctly
             let drawRect = CGRect(
-                x: -safeCropRect.minX * displayWidth / imageSize.width * scale,
-                y: -safeCropRect.minY * displayHeight / imageSize.height * scale,
-                width: displayWidth * scale,
-                height: displayHeight * scale
+                x: -safeCropRect.minX * (cropSize / safeCropRect.width),
+                y: -safeCropRect.minY * (cropSize / safeCropRect.height),
+                width: sourceSize.width * (cropSize / safeCropRect.width),
+                height: sourceSize.height * (cropSize / safeCropRect.height)
             )
             
+            // Draw the image
             sourceImage.draw(in: drawRect)
         }
-        
-        print("DEBUG: ImageCropView - Created circular cropped image with renderer")
-        return croppedImage
     }
 }
 

@@ -15,7 +15,7 @@ struct TutorialView: View {
         ),
         TutorialSlide(
             title: "How It Works 🤔",
-            description: "Create your profile, add your quirky traits, and watch friends guess about you! Plus, you get to play detective too! 🕵️‍♀️",
+            description: "Create your profile, add your quirky traits, and watch other players guess about you! Plus, you get to play detective too! 🕵️‍♀️",
             imageName: "person.2.fill",
             backgroundColor: AppTheme.tertiary
         ),
@@ -39,7 +39,7 @@ struct TutorialView: View {
         ),
         TutorialSlide(
             title: "Ready to Rock? 🚀",
-            description: "Let's set up your profile and dive into the wacky world of MugMatch! Your friends won't know what hit them!",
+            description: "Let's set up your profile and dive into the wacky world of MugMatch! Other players will love guessing about you!",
             imageName: "arrow.right.circle.fill",
             backgroundColor: AppTheme.primary
         )

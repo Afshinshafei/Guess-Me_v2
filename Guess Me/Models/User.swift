@@ -1,7 +1,7 @@
 import Foundation
 import FirebaseFirestore
 
-struct User: Identifiable, Codable {
+struct User: Identifiable, Codable, Equatable {
     @DocumentID var id: String?
     var username: String
     var email: String
@@ -26,6 +26,12 @@ struct User: Identifiable, Codable {
     var totalGuesses: Int = 0
     var hasCompletedSetup: Bool = false
     
+    // Apple Sign In
+    var appleUserIdentifier: String?
+    
+    // Game stats
+    var rankings: [String: Int] = [:]
+    
     // Add explicit initializer
     init(id: String? = nil, 
          username: String, 
@@ -49,7 +55,8 @@ struct User: Identifiable, Codable {
          highestStreak: Int = 0, 
          correctGuesses: Int = 0, 
          totalGuesses: Int = 0,
-         hasCompletedSetup: Bool = false) {
+         hasCompletedSetup: Bool = false,
+         appleUserIdentifier: String? = nil) {
         
         self.id = id
         self.username = username
@@ -74,6 +81,7 @@ struct User: Identifiable, Codable {
         self.correctGuesses = correctGuesses
         self.totalGuesses = totalGuesses
         self.hasCompletedSetup = hasCompletedSetup
+        self.appleUserIdentifier = appleUserIdentifier
     }
     
     enum CodingKeys: String, CodingKey {
@@ -100,13 +108,21 @@ struct User: Identifiable, Codable {
         case correctGuesses
         case totalGuesses
         case hasCompletedSetup
+        case appleUserIdentifier
     }
     
     // Computed property to check if profile is complete
     var isProfileComplete: Bool {
-        return username.count > 0 &&
-               age != nil &&
-               height != nil &&
-               weight != nil
+        return !username.isEmpty && 
+               !email.isEmpty && 
+               (age != nil || height != nil || weight != nil || 
+                occupation != nil || education != nil || 
+                favoriteColor != nil || favoriteMovie != nil || 
+                favoriteFood != nil || favoriteSport != nil || 
+                favoriteHobby != nil)
+    }
+    
+    static func == (lhs: User, rhs: User) -> Bool {
+        return lhs.id == rhs.id
     }
 } 

@@ -119,7 +119,13 @@ final class ProfileSetupViewModel: ObservableObject, Sendable {
         case 0: // Basic info
             return !username.isEmpty && !age.isEmpty && Int(age) != nil
         case 1: // Details
-            return true // No need to validate height and weight as they're always valid with pickers
+            return !occupation.isEmpty &&
+                !favoriteColor.isEmpty &&
+                !favoriteMovie.isEmpty &&
+                !favoriteFood.isEmpty &&
+                !favoriteFlower.isEmpty &&
+                !favoriteSport.isEmpty &&
+                !favoriteHobby.isEmpty
         case 2: // Photo
             return selectedImage != nil
         case 3: // Review
@@ -168,9 +174,32 @@ final class ProfileSetupViewModel: ObservableObject, Sendable {
                 message += "\n- Valid age"
             }
         case 1:
-            message = "Please select valid height and weight"
+            if occupation.isEmpty {
+                message += "\n- Occupation"
+            }
+            if favoriteColor.isEmpty {
+                message += "\n- Favorite Color"
+            }
+            if favoriteMovie.isEmpty {
+                message += "\n- Favorite Movie"
+            }
+            if favoriteFood.isEmpty {
+                message += "\n- Favorite Food"
+            }
+            if favoriteFlower.isEmpty {
+                message += "\n- Favorite Flower"
+            }
+            if favoriteSport.isEmpty {
+                message += "\n- Favorite Sport"
+            }
+            if favoriteHobby.isEmpty {
+                message += "\n- Favorite Hobby"
+            }
+            // Height, weight, education, and smoker are always set by pickers/toggle, so no need to check
         case 2:
-            message = "Please select a profile photo"
+            if selectedImage == nil {
+                message = "Please select a profile photo"
+            }
         default:
             message = "Please complete all required fields"
         }

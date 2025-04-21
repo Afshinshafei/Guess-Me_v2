@@ -3,6 +3,7 @@ import PhotosUI
 import Combine
 import FirebaseAuth
 import GoogleMobileAds
+import FirebaseFirestore
 
 @MainActor
 class ProfileViewModel: ObservableObject, Sendable {
@@ -24,7 +25,7 @@ class ProfileViewModel: ObservableObject, Sendable {
     @Published var weight: String = ""
     @Published var smoker = false
     
-    nonisolated let authService: AuthenticationService
+    var authService: AuthenticationService
     private var cancellables = Set<AnyCancellable>()
     
     init(authService: AuthenticationService) {
@@ -181,11 +182,60 @@ class ProfileViewModel: ObservableObject, Sendable {
             }
         }
     }
+    
+    // Delete the user account and all associated data
+    public func deleteAccount() {
+        isLoading = true
+        print("DEBUG: Starting account deletion process")
+        
+        authService.deleteAccount()
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    
+                    if case .failure(let error) = completion {
+                        print("ERROR: Failed to delete account: \(error)")
+                        
+                        // Handle different error types
+                        let nsError = error as NSError
+                        if nsError.code == 9999 && nsError.domain == "AuthenticationService" {
+                            // This is our custom re-authentication error
+                            self.errorMessage = nsError.localizedDescription
+                            self.showError = true
+                            
+                            // Sign out user to allow for re-authentication
+                            self.authService.signOut()
+                                .sink { _ in } receiveValue: { _ in }
+                                .store(in: &self.cancellables)
+                        } else {
+                            // For permission errors and other issues, show a simplified message rather than the full error
+                            if error.localizedDescription.contains("Permission denied") || 
+                               error.localizedDescription.contains("permission") ||
+                               error.localizedDescription.contains("unauthorized") {
+                                self.errorMessage = "Could not delete your account due to a permissions issue. Please contact support."
+                            } else {
+                                self.errorMessage = "Failed to delete account: \(error.localizedDescription)"
+                            }
+                            self.showError = true
+                        }
+                    } else {
+                        print("DEBUG: Account successfully deleted")
+                        // Navigation to auth screen is handled by the NavigationCoordinator
+                        // which observes authService.isAuthenticated
+                    }
+                }
+            } receiveValue: { _ in
+                // Success is handled in completion handler
+            }
+            .store(in: &authService.cancellables)
+    }
 }
 
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var gameManager: GameManager
+    @StateObject private var viewModel: ProfileViewModel
     
     // Sheet presentation state
     enum SheetType: Identifiable {
@@ -215,6 +265,8 @@ struct ProfileView: View {
     @State private var showAllAchievements = false
     @State private var originalImage: UIImage?
     @State private var showPhotosPicker = false
+    @State private var showPrivacySheet = false
+    @State private var showHelpSheet = false
     
     private var earnedCount: Int {
         authService.user?.achievements.count ?? 0
@@ -222,6 +274,11 @@ struct ProfileView: View {
     
     private var totalCount: Int {
         Achievement.allAchievements.count
+    }
+    
+    init() {
+        // Initialize with temporary AuthenticationService - this will be replaced in onAppear
+        _viewModel = StateObject(wrappedValue: ProfileViewModel(authService: AuthenticationService()))
     }
     
     private func uploadProfileImage(_ image: UIImage) {
@@ -422,6 +479,10 @@ struct ProfileView: View {
                     },
                     secondaryButton: .cancel()
                 )
+            }
+            .onAppear {
+                // Update the view model with the actual auth service
+                viewModel.authService = authService
             }
         }
     }
@@ -730,20 +791,11 @@ struct ProfileView: View {
             
             VStack(spacing: 5) {
                 SettingsRow(
-                    icon: "bell.fill",
-                    iconColor: AppTheme.tertiary,
-                    title: "Notifications",
-                    action: {
-                        // Open notifications settings
-                    }
-                )
-                
-                SettingsRow(
                     icon: "lock.fill",
                     iconColor: AppTheme.secondary,
                     title: "Privacy",
                     action: {
-                        // Open privacy settings
+                        showPrivacySheet = true
                     }
                 )
                 
@@ -752,7 +804,7 @@ struct ProfileView: View {
                     iconColor: AppTheme.primary,
                     title: "Help & Support",
                     action: {
-                        // Open help
+                        showHelpSheet = true
                     }
                 )
                 
@@ -764,6 +816,41 @@ struct ProfileView: View {
                         showingLogoutAlert = true
                     }
                 )
+                
+                SettingsRow(
+                    icon: "person.crop.circle.badge.minus",
+                    iconColor: Color.red,
+                    title: "Delete Account",
+                    action: {
+                        print("DEBUG: Delete account button tapped")
+                        // Show confirmation alert using UIKit since SwiftUI alert might be having issues
+                        let alertController = UIAlertController(
+                            title: "Delete Account",
+                            message: "WARNING: This will permanently delete your account and ALL associated data, including:\n\n• Profile information\n• Photos\n• Achievements\n• Game progress\n• All activity history\n\nThis action CANNOT be undone. Are you absolutely sure?",
+                            preferredStyle: .alert
+                        )
+                        
+                        alertController.addAction(UIAlertAction(
+                            title: "Yes, Delete My Account",
+                            style: .destructive,
+                            handler: { _ in
+                                viewModel.deleteAccount()
+                            }
+                        ))
+                        
+                        alertController.addAction(UIAlertAction(
+                            title: "Cancel",
+                            style: .cancel,
+                            handler: nil
+                        ))
+                        
+                        // Get the root view controller to present the alert
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let rootViewController = windowScene.windows.first?.rootViewController {
+                            rootViewController.present(alertController, animated: true, completion: nil)
+                        }
+                    }
+                )
             }
         }
         .padding(20)
@@ -772,6 +859,13 @@ struct ProfileView: View {
                 .fill(AppTheme.cardBackground)
                 .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
         )
+        .padding(.bottom, 40)
+        .sheet(isPresented: $showPrivacySheet) {
+            PrivacySheetView()
+        }
+        .sheet(isPresented: $showHelpSheet) {
+            HelpSupportSheetView()
+        }
     }
     
     private func calculateAccuracyString() -> String {
@@ -1569,6 +1663,55 @@ struct InfoRow: View {
             Text(value)
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundColor(AppTheme.textPrimary)
+        }
+    }
+}
+
+struct PrivacySheetView: View {
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Privacy Policy")
+                        .font(AppTheme.title())
+                        .padding(.bottom, 8)
+                    Text("We value your privacy. Your personal information is only used to provide and improve the app experience. We do not sell or share your data with third parties. You can request deletion of your account and data at any time. For more details, please contact us at afshinshafeiapp@gmail.com.")
+                        .font(AppTheme.body())
+                        .foregroundColor(AppTheme.textSecondary)
+                        .padding(.bottom, 8)
+                    Text("- You control your profile information and can update or delete it at any time.\n- We only request permissions necessary for app functionality (e.g., photos for your profile image).\n- Analytics, if used, are anonymized and only for improving the app.")
+                        .font(AppTheme.caption())
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+                .padding()
+            }
+            .navigationTitle("Privacy")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+struct HelpSupportSheetView: View {
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Help & Support")
+                        .font(AppTheme.title())
+                        .padding(.bottom, 8)
+                    Text("App Version: 1.1.0")
+                        .font(AppTheme.body())
+                    Text("Contact: afshinshafeiapp@gmail.com")
+                        .font(AppTheme.body())
+                        .foregroundColor(AppTheme.primary)
+                    Text("If you have any questions, feedback, or need support, please email us. We'll get back to you as soon as possible.")
+                        .font(AppTheme.body())
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+                .padding()
+            }
+            .navigationTitle("Help & Support")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 } 

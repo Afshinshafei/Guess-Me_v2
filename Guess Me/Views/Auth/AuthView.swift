@@ -3,6 +3,7 @@ import Combine
 import FirebaseAuth
 import GoogleSignIn
 import UIKit
+import AuthenticationServices
 
 struct AuthView: View {
     @State private var isSigningUp = false
@@ -32,34 +33,31 @@ struct AuthView: View {
                 }
                 
                 // Content
-                VStack(spacing: 20) {
-                    Spacer()
-                    
-                    // Logo and welcome text
-                    VStack(spacing: 10) {
-                        Image(systemName: "person.2.circle.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 100, height: 100)
-                            .foregroundColor(AppTheme.textOnDark)
-                            .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Logo and welcome text
+                        VStack(spacing: 10) {
+                            Image(systemName: "person.2.circle.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 100, height: 100)
+                                .foregroundColor(AppTheme.textOnDark)
+                                .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
+                            
+                            Text("MugMatch")
+                                .font(AppTheme.title())
+                                .foregroundColor(AppTheme.textOnDark)
+                                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                            
+                            Text("The Social Guessing Game")
+                                .font(AppTheme.subheading())
+                                .foregroundColor(AppTheme.textOnDark.opacity(0.8))
+                                .padding(.bottom, 10)
+                        }
+                        .padding(.top, 40)
                         
-                        Text("MugMatch")
-                            .font(AppTheme.title())
-                            .foregroundColor(AppTheme.textOnDark)
-                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                        
-                        Text("The Social Guessing Game")
-                            .font(AppTheme.subheading())
-                            .foregroundColor(AppTheme.textOnDark.opacity(0.8))
-                            .padding(.bottom, 10)
-                    }
-                    
-                    Spacer()
-                    
-                    // Auth form container
-                    VStack {
-                        ScrollView(showsIndicators: false) {
+                        // Auth form container
+                        VStack {
                             // Auth form
                             if isSigningUp {
                                 SignUpView(isSigningUp: $isSigningUp)
@@ -80,20 +78,21 @@ struct AuthView: View {
                                     .padding(.top, 10)
                             }
                         }
+                        .padding(24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 30)
+                                .fill(AppTheme.cardBackground)
+                                .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
+                        )
+                        .padding(.horizontal)
+                        .padding(.bottom, 40)
                     }
-                    .padding(24)
-                    .background(
-                        RoundedRectangle(cornerRadius: 30)
-                            .fill(AppTheme.cardBackground)
-                            .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
-                    )
-                    .padding(.horizontal)
-                    .frame(maxHeight: UIScreen.main.bounds.height * 0.7)
+                    .padding(.vertical)
                 }
-                .padding(.vertical, 40)
                 .navigationBarHidden(true)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
@@ -102,8 +101,10 @@ struct SignInView: View {
     @State private var password = ""
     @State private var isLoading = false
     @State private var isGoogleSignInLoading = false
+    @State private var isAppleSignInLoading = false
     @Binding var isSigningUp: Bool
     @EnvironmentObject var authService: AuthenticationService
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         VStack(spacing: 20) {
@@ -126,6 +127,7 @@ struct SignInView: View {
                         .keyboardType(.emailAddress)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
+                        .textContentType(.username)
                 }
                 .padding()
                 .background(
@@ -149,6 +151,7 @@ struct SignInView: View {
                         .foregroundColor(AppTheme.primary)
                     
                     SecureField("••••••••", text: $password)
+                        .textContentType(.password)
                 }
                 .padding()
                 .background(
@@ -196,6 +199,22 @@ struct SignInView: View {
             }
             .padding(.vertical, 8)
             
+            // Sign in with Apple Button
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    let authRequest = authService.startSignInWithAppleFlow()
+                    request.requestedScopes = authRequest.requestedScopes
+                    request.nonce = authRequest.nonce
+                },
+                onCompletion: { result in
+                    handleAppleSignInResult(result)
+                }
+            )
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+            .frame(height: 50)
+            .padding(.bottom, 8)
+            
             // Google Sign-In Button
             Button(action: signInWithGoogle) {
                 HStack {
@@ -219,9 +238,10 @@ struct SignInView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(AppTheme.textSecondary.opacity(0.3), lineWidth: 1)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                        .background(RoundedRectangle(cornerRadius: 16)
+                            .fill(colorScheme == .dark ? Color(UIColor.systemGray6) : Color.white))
                 )
-                .foregroundColor(AppTheme.textPrimary)
+                .foregroundColor(colorScheme == .dark ? Color.white : AppTheme.textPrimary)
                 .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
             }
             .disabled(isGoogleSignInLoading)
@@ -279,6 +299,36 @@ struct SignInView: View {
             }
             .store(in: &authService.cancellables)
     }
+    
+    private func handleAppleSignInResult(_ result: Result<ASAuthorization, Error>) {
+        isAppleSignInLoading = true
+        
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                isAppleSignInLoading = false
+                print("Error: Could not get Apple ID credential")
+                return
+            }
+            
+            authService.signInWithApple(credential: credential)
+                .receive(on: DispatchQueue.main)
+                .sink { completion in
+                    isAppleSignInLoading = false
+                    
+                    if case .failure(let error) = completion {
+                        print("Error signing in with Apple: \(error)")
+                    }
+                } receiveValue: { _ in
+                    // Successfully signed in, the auth state listener will handle the transition
+                }
+                .store(in: &authService.cancellables)
+            
+        case .failure(let error):
+            isAppleSignInLoading = false
+            print("Apple sign in failed: \(error)")
+        }
+    }
 }
 
 struct SignUpView: View {
@@ -288,10 +338,12 @@ struct SignUpView: View {
     @State private var username = ""
     @State private var isLoading = false
     @State private var isGoogleSignInLoading = false
+    @State private var isAppleSignInLoading = false
     @State private var signupSuccess = false
     @Binding var isSigningUp: Bool
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var navigationCoordinator: NavigationCoordinator
+    @Environment(\.colorScheme) var colorScheme
     
     var passwordsMatch: Bool {
         return password == confirmPassword
@@ -368,6 +420,7 @@ struct SignUpView: View {
                             .keyboardType(.emailAddress)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
+                            .textContentType(.emailAddress)
                     }
                     .padding()
                     .background(
@@ -391,6 +444,7 @@ struct SignUpView: View {
                             .foregroundColor(AppTheme.tertiary)
                         
                         SecureField("At least 6 characters", text: $password)
+                            .textContentType(.newPassword)
                     }
                     .padding()
                     .background(
@@ -414,6 +468,7 @@ struct SignUpView: View {
                             .foregroundColor(AppTheme.tertiary)
                         
                         SecureField("Confirm your password", text: $confirmPassword)
+                            .textContentType(.newPassword)
                     }
                     .padding()
                     .background(
@@ -466,6 +521,22 @@ struct SignUpView: View {
                 }
                 .padding(.vertical, 8)
                 
+                // Sign in with Apple Button
+                SignInWithAppleButton(
+                    .signUp,
+                    onRequest: { request in
+                        let authRequest = authService.startSignInWithAppleFlow()
+                        request.requestedScopes = authRequest.requestedScopes
+                        request.nonce = authRequest.nonce
+                    },
+                    onCompletion: { result in
+                        handleAppleSignInResult(result)
+                    }
+                )
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: 50)
+                .padding(.bottom, 8)
+                
                 // Google Sign-Up Button
                 Button(action: signUpWithGoogle) {
                     HStack {
@@ -489,9 +560,10 @@ struct SignUpView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(AppTheme.textSecondary.opacity(0.3), lineWidth: 1)
-                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                            .background(RoundedRectangle(cornerRadius: 16)
+                                .fill(colorScheme == .dark ? Color(UIColor.systemGray6) : Color.white))
                     )
-                    .foregroundColor(AppTheme.textPrimary)
+                    .foregroundColor(colorScheme == .dark ? Color.white : AppTheme.textPrimary)
                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                 }
                 .disabled(isGoogleSignInLoading)
@@ -559,6 +631,41 @@ struct SignUpView: View {
                 // The auth state listener will handle the transition
             }
             .store(in: &authService.cancellables)
+    }
+    
+    private func handleAppleSignInResult(_ result: Result<ASAuthorization, Error>) {
+        isAppleSignInLoading = true
+        
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                isAppleSignInLoading = false
+                print("Error: Could not get Apple ID credential")
+                return
+            }
+            
+            authService.signInWithApple(credential: credential)
+                .receive(on: DispatchQueue.main)
+                .sink { completion in
+                    isAppleSignInLoading = false
+                    
+                    if case .failure(let error) = completion {
+                        print("Error signing up with Apple: \(error)")
+                    }
+                } receiveValue: { _ in
+                    // Successfully signed in, the auth state listener will handle the transition
+                    print("DEBUG: Apple sign in successful, showing success message")
+                    // Show success message before transitioning
+                    withAnimation(.spring(response: 0.5)) {
+                        signupSuccess = true
+                    }
+                }
+                .store(in: &authService.cancellables)
+            
+        case .failure(let error):
+            isAppleSignInLoading = false
+            print("Apple sign up failed: \(error)")
+        }
     }
 }
 

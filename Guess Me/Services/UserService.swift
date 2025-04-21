@@ -85,6 +85,29 @@ class UserService {
         .eraseToAnyPublisher()
     }
     
+    // Delete a user's data from Firestore
+    func deleteUser(userId: String) -> AnyPublisher<Void, Error> {
+        return Future<Void, Error> { [weak self] promise in
+            guard let self = self else {
+                promise(.failure(NSError(domain: "UserService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Service unavailable"])))
+                return
+            }
+            
+            // Delete the user document
+            self.db.collection(self.usersCollection).document(userId).delete { error in
+                if let error = error {
+                    print("DEBUG: Error deleting user from Firestore: \(error)")
+                    promise(.failure(error))
+                    return
+                }
+                
+                print("DEBUG: Successfully deleted user data from Firestore")
+                promise(.success(()))
+            }
+        }
+        .eraseToAnyPublisher()
+    }
+    
     func fetchRandomUsers(excluding uid: String, limit: Int = 10) -> AnyPublisher<[User], Error> {
         return Future<[User], Error> { [weak self] promise in
             guard let self = self else {

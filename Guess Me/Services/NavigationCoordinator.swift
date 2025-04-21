@@ -27,6 +27,7 @@ class NavigationCoordinator: ObservableObject {
     init(authService: AuthenticationService) {
         self.authService = authService
         setupAuthListener()
+        setupAccountDeletionObserver()
     }
     
     // Method to update the auth service reference
@@ -41,6 +42,7 @@ class NavigationCoordinator: ObservableObject {
         
         // Re-setup listeners
         setupAuthListener()
+        setupAccountDeletionObserver()
     }
     
     // Force navigation to a specific screen
@@ -103,6 +105,20 @@ class NavigationCoordinator: ObservableObject {
                 } else {
                     print("DEBUG: NavigationCoordinator - User data cleared")
                 }
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func setupAccountDeletionObserver() {
+        // Listen for account deletion notification
+        NotificationCenter.default.publisher(for: NSNotification.Name("AccountDeleted"))
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                
+                print("DEBUG: NavigationCoordinator - Received account deletion notification")
+                
+                // Force navigation to auth screen
+                self.forceNavigateTo(.auth, reason: "Account deleted")
             }
             .store(in: &cancellables)
     }

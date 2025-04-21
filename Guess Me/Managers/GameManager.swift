@@ -7,54 +7,78 @@ class GameManager: ObservableObject {
     @Published var lastLifeRegenTime: Date?
     @Published var currentStreak: Int = 0
     @Published var isRegeneratingLives: Bool = false
+    @Published var isGameOver: Bool = false
     public let maxLives = 5
     private let lifeRegenerationTimeInSeconds: TimeInterval = 7200 // 2 hours
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var currentUserId: String?
     
+    // New properties for game mechanics
+    @Published var questions: [Question] = []
+    @Published var currentQuestionIndex: Int = 0
+    @Published var score: Int = 0
+    @Published var correctAnswers: Int = 0
+    
     init() {
+        // Initialize with default values, but don't reset lives yet
+        currentStreak = 0
+        score = 0
+        correctAnswers = 0
+        
+        // Setup the timer for life regeneration check
         setupTimer()
-        loadUserData(nil)
     }
     
     func loadUserData(_ userId: String?) {
-        // If this is a different user than before, reset data
-        if currentUserId != userId {
-            resetToDefault()
-            currentUserId = userId
-        } else if userId != nil {
-            // Only load saved data if we have a user ID
-            loadSavedData()
-        }
-    }
-    
-    private func loadSavedData() {
-        if let userIdKey = currentUserId {
+        // Store the user ID
+        self.currentUserId = userId
+        
+        if let userIdKey = userId {
             print("Loading game data for user: \(userIdKey)")
             
             // User-specific keys
             let livesKey = "lives_\(userIdKey)"
             let streakKey = "currentStreak_\(userIdKey)"
             let regenTimeKey = "lastLifeRegenTime_\(userIdKey)"
+            let isGameOverKey = "isGameOver_\(userIdKey)"
             
+            // Load lives
+            if UserDefaults.standard.object(forKey: livesKey) != nil {
+                self.lives = UserDefaults.standard.integer(forKey: livesKey)
+            } else {
+                // Only set to max lives if we've never saved before
+                self.lives = maxLives
+            }
+            
+            // Load lastLifeRegenTime
             if let lastLifeRegenTimeData = UserDefaults.standard.object(forKey: regenTimeKey) as? Date {
                 self.lastLifeRegenTime = lastLifeRegenTimeData
-                checkLifeRegeneration()
+                // Set isRegeneratingLives based on lives and lastLifeRegenTime
+                self.isRegeneratingLives = (self.lives < maxLives)
+            } else {
+                self.lastLifeRegenTime = nil
+                self.isRegeneratingLives = false
             }
             
-            if let lives = UserDefaults.standard.object(forKey: livesKey) as? Int {
-                self.lives = lives
-            }
-            
+            // Load streak
             if let streak = UserDefaults.standard.object(forKey: streakKey) as? Int {
                 self.currentStreak = streak
             }
             
-            print("Loaded lives: \(lives), streak: \(currentStreak)")
+            // Load game over state
+            if let gameOver = UserDefaults.standard.object(forKey: isGameOverKey) as? Bool {
+                self.isGameOver = gameOver
+            }
+            
+            // Check for life regeneration immediately
+            checkLifeRegeneration()
+            
+            print("Loaded lives: \(lives), streak: \(currentStreak), isGameOver: \(isGameOver)")
         } else {
-            // No user ID, use default values
-            resetToDefault()
+            // No user ID, don't reset to default here
+            // We'll wait until we have a user ID
+            print("No user ID provided, waiting for user authentication")
         }
     }
     
@@ -63,12 +87,18 @@ class GameManager: ObservableObject {
         lives = maxLives
         currentStreak = 0
         lastLifeRegenTime = nil
+        isGameOver = false
+        saveLivesData()
+        saveGameState()
     }
     
     func resetLives() {
         lives = maxLives
         lastLifeRegenTime = nil
+        isRegeneratingLives = false
+        isGameOver = false
         saveLivesData()
+        saveGameState()
     }
     
     private func saveLivesData() {
@@ -80,6 +110,12 @@ class GameManager: ObservableObject {
             } else {
                 UserDefaults.standard.removeObject(forKey: "lastLifeRegenTime_\(userIdKey)")
             }
+        }
+    }
+    
+    private func saveGameState() {
+        if let userIdKey = currentUserId {
+            UserDefaults.standard.set(isGameOver, forKey: "isGameOver_\(userIdKey)")
         }
     }
     
@@ -103,21 +139,15 @@ class GameManager: ObservableObject {
         
         isRegeneratingLives = true
         let elapsedTime = Date().timeIntervalSince(lastLifeRegenTime)
-        let livesToAdd = Int(elapsedTime / lifeRegenerationTimeInSeconds)
         
-        if livesToAdd > 0 {
-            lives = min(lives + livesToAdd, maxLives)
-            
-            // If we still haven't reached max lives, update the last regen time
-            if lives < maxLives {
-                let remainderTime = elapsedTime.truncatingRemainder(dividingBy: lifeRegenerationTimeInSeconds)
-                self.lastLifeRegenTime = Date().addingTimeInterval(-remainderTime)
-            } else {
-                // We're at max lives, no need to track regen time
-                self.lastLifeRegenTime = nil
-                isRegeneratingLives = false
-            }
-            
+        // Check if at least one full regeneration period has passed
+        if elapsedTime >= lifeRegenerationTimeInSeconds {
+            // Restore all lives after waiting for the regeneration period
+            lives = maxLives
+            self.lastLifeRegenTime = nil
+            isRegeneratingLives = false
+            isGameOver = false
+            saveGameState()
             saveLivesData()
         }
     }
@@ -135,6 +165,8 @@ class GameManager: ObservableObject {
         lives -= 1
         if lives <= 0 {
             updateLastLifeRegenTime()
+            isGameOver = true
+            saveGameState()
         }
         saveLivesData()
         return true
@@ -145,6 +177,9 @@ class GameManager: ObservableObject {
             lives += 1
             if lives == maxLives {
                 lastLifeRegenTime = nil
+                isRegeneratingLives = false
+                isGameOver = false
+                saveGameState()
             }
             saveLivesData()
         }
@@ -168,23 +203,13 @@ class GameManager: ObservableObject {
         return remaining
     }
     
-    // New properties for game mechanics
-    @Published var questions: [Question] = []
-    @Published var currentQuestionIndex: Int = 0
-    @Published var score: Int = 0
-    @Published var correctAnswers: Int = 0
-    @Published var isGameOver: Bool = false
-    
     // Load questions for the game
     func loadQuestions() {
         // Reset game state
         currentQuestionIndex = 0
         score = 0
         correctAnswers = 0
-        isGameOver = false
-        
-        // We'll fetch real users and generate questions in the GameViewModel
-        // This method is now just a placeholder for game state reset
+        // Don't reset isGameOver here, as it should persist
     }
     
     // Check if the game is over based on lives
@@ -192,6 +217,7 @@ class GameManager: ObservableObject {
         if lives <= 0 {
             isGameOver = true
             isRegeneratingLives = true
+            saveGameState()
             
             // Make sure we start the life regeneration timer if not already started
             if lastLifeRegenTime == nil {
@@ -242,9 +268,13 @@ class GameManager: ObservableObject {
     
     func restartGame() {
         loadQuestions()
+        
+        // Only reset game over state, not lives
+        isGameOver = false
+        saveGameState()
     }
     
     deinit {
         timer?.invalidate()
     }
-} 
+}

@@ -165,14 +165,14 @@ struct CustomTabBar: View {
                         .offset(y: -12)
                     
                     // Text below the button
-                    Text("GUESS NOW")
-                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                    Text("PLAY")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(selectedTab == 1 ? AppTheme.primary : AppTheme.textSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                        .padding(.top, 4)
+                        .padding(.top, 2)
                         .padding(.bottom, 2)
-                        .offset(y: -4)
+                        .offset(y: -8)
                 }
             }
             .onTapGesture {

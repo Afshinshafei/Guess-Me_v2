@@ -3,12 +3,14 @@ import GoogleMobileAds
 import UIKit
 import SwiftUI
 
-class AdMobManager: NSObject, ObservableObject {
+// Conforms to FullScreenContentDelegate to handle ad lifecycle events
+class AdMobManager: NSObject, ObservableObject, FullScreenContentDelegate {
     static let shared = AdMobManager()
     
     @Published var isRewardedAdReady = false
-    @Published var isLoading = false
+    @Published private(set) var isLoading = false // Use private(set) to control modification
     
+    // Use RewardedAd instead of GADRewardedAd
     private var rewardedAd: RewardedAd?
     // Production Rewarded Ad Unit ID for Lives Reset Reward
     private let rewardedAdUnitID = "ca-app-pub-1651937682854848/5620357296"
@@ -18,105 +20,145 @@ class AdMobManager: NSObject, ObservableObject {
     
     private override init() {
         super.init()
-        print("AdMobManager: Initializing and loading initial rewarded ad")
-        loadRewardedAd()
+        print("AdMobManager: Initializing.")
+        // Load the first ad asynchronously
+        Task {
+            await loadRewardedAd()
+        }
     }
     
-    func loadRewardedAd() {
-        guard !isLoading else { 
-            print("AdMobManager: Already loading a rewarded ad, skipping duplicate request")
-            return 
+    // Use async/await for loading
+    func loadRewardedAd() async {
+        // Prevent concurrent loading attempts
+        guard !isLoading else {
+            print("AdMobManager: Already loading a rewarded ad.")
+            return
         }
-        
+        // Prevent loading if an ad is already loaded and ready
+        guard rewardedAd == nil else {
+             print("AdMobManager: An ad is already loaded and ready.")
+             isRewardedAdReady = true // Ensure state is correct
+             return
+        }
+
         isLoading = true
+        isRewardedAdReady = false // Mark ad as not ready while loading
         print("AdMobManager: Starting to load rewarded ad with ID: \(rewardedAdUnitID)")
-        
-        let request = Request()
-        RewardedAd.load(with: rewardedAdUnitID, request: request) { [weak self] ad, error in
-            guard let self = self else { return }
-            
-            self.isLoading = false
-            
-            if let error = error {
-                print("AdMobManager: Failed to load rewarded ad with error: \(error.localizedDescription)")
-                self.isRewardedAdReady = false
-                
-                // Try loading again after a delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                    print("AdMobManager: Attempting to reload rewarded ad after failure")
-                    self.loadRewardedAd()
-                }
-                return
-            }
-            
+
+        do {
+            // Use Request and the async load method
+            let ad = try await RewardedAd.load(
+                with: rewardedAdUnitID, request: Request())
+
             self.rewardedAd = ad
+            // Set the delegate to handle presentation events
+            self.rewardedAd?.fullScreenContentDelegate = self
             self.isRewardedAdReady = true
-            print("AdMobManager: Rewarded ad loaded successfully and is ready to show")
-            
-            // Set up a callback for when the ad is paid for
-            ad?.paidEventHandler = { [weak self] adValue in
-                print("AdMobManager: Rewarded ad paid event: \(adValue.value) \(adValue.currencyCode)")
-            }
+            self.isLoading = false
+            print("AdMobManager: Rewarded ad loaded successfully and is ready.")
+
+        } catch {
+            self.rewardedAd = nil // Ensure ad is nil on failure
+            self.isRewardedAdReady = false
+            self.isLoading = false
+            print("AdMobManager: Failed to load rewarded ad with error: \(error.localizedDescription)")
+
+            // Optional: Retry loading after a delay
+            // Consider a more robust retry strategy (e.g., exponential backoff)
+            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+            print("AdMobManager: Retrying ad load after failure.")
+            await loadRewardedAd()
         }
     }
     
+    // Simplified presentation function
     func showRewardedAd(from viewController: UIViewController, completion: @escaping (Bool) -> Void) {
-        guard let rewardedAd = rewardedAd, isRewardedAdReady else {
-            print("AdMobManager: Rewarded ad not ready yet, loading a new one...")
-            loadRewardedAd()
-            
-            // Wait a moment and try again
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                if let ad = self.rewardedAd, self.isRewardedAdReady {
-                    print("AdMobManager: Ad loaded after delay, presenting now")
-                    self.presentAd(ad, from: viewController, completion: completion)
-                } else {
-                    print("AdMobManager: Ad still not ready after delay, giving up")
-                    completion(false)
+        guard let ad = rewardedAd, isRewardedAdReady else {
+            print("AdMobManager: Rewarded ad is not ready to show.")
+            completion(false)
+            // Attempt to load a new ad if none is ready
+            if !isLoading {
+                Task {
+                    await loadRewardedAd()
                 }
             }
             return
         }
-        
-        presentAd(rewardedAd, from: viewController, completion: completion)
-    }
-    
-    private func presentAd(_ ad: RewardedAd, from viewController: UIViewController, completion: @escaping (Bool) -> Void) {
-        print("AdMobManager: Presenting rewarded ad to user")
-        
-        // Double-check that viewController is valid
-        if viewController.view.window == nil {
-            print("AdMobManager: Error - View controller is not in view hierarchy")
+
+        // Ensure the view controller is valid for presentation
+        guard viewController.view.window != nil else {
+            print("AdMobManager: Error - View controller is not in view hierarchy. Cannot present ad.")
             completion(false)
             return
         }
         
+        print("AdMobManager: Attempting to present rewarded ad.")
+        // Present the ad and handle the reward callback
         ad.present(from: viewController) { [weak self] in
-            print("AdMobManager: User completed watching the ad and earned reward")
+            print("AdMobManager: User earned reward.")
+            // Reward granted
             completion(true)
-            self?.isRewardedAdReady = false
             
-            // Load the next ad immediately
-            DispatchQueue.main.async {
-                print("AdMobManager: Loading next rewarded ad after successful display")
-                self?.loadRewardedAd()
+            // Ad is used, mark as not ready and prepare for the next one
+            self?.rewardedAd = nil // Ad can only be shown once
+            self?.isRewardedAdReady = false
+            // Load the next ad immediately in the background
+            Task {
+                await self?.loadRewardedAd()
             }
         }
     }
     
+    // MARK: - FullScreenContentDelegate Methods
+
+    /// Tells the delegate that the ad failed to present full screen content.
+    func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
+        print("AdMobManager: Ad failed to present full screen content with error: \(error.localizedDescription)")
+        rewardedAd = nil // Ad failed, discard it
+        isRewardedAdReady = false
+        // Load the next ad
+        Task {
+            await loadRewardedAd()
+        }
+    }
+
+    /// Tells the delegate that the ad will present full screen content.
+    func adWillPresentFullScreenContent(_ ad: FullScreenPresentingAd) {
+        print("AdMobManager: Ad will present full screen content.")
+        // You could pause game audio here if needed
+    }
+
+    /// Tells the delegate that the ad dismissed full screen content.
+    func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
+        print("AdMobManager: Ad did dismiss full screen content.")
+        // If the user dismissed the ad *without* earning the reward, the reward handler in present() won't fire.
+        // We still need to load the next ad.
+        if rewardedAd === ad { // Check if it's the same ad instance
+             rewardedAd = nil // Ad is used/dismissed
+             isRewardedAdReady = false
+             Task {
+                 await loadRewardedAd()
+             }
+        }
+        // You could resume game audio here
+    }
+
+    // MARK: - Banner Ad Logic (Unchanged)
+
     // Create a banner ad view with adaptive size
-    func createBannerAdView() -> BannerView {
-        let bannerView = BannerView()
+    func createBannerAdView() -> BannerView { // Use BannerView
+        let bannerView = BannerView() // Use BannerView
         bannerView.adUnitID = bannerAdUnitID
         
         let viewWidth = UIScreen.main.bounds.width
-        bannerView.adSize = .init(size: CGSize(width: viewWidth, height: 50), flags: 0)
+        // Use currentOrientationAnchoredAdaptiveBanner
+        bannerView.adSize = currentOrientationAnchoredAdaptiveBanner(width: viewWidth)
         
         // Fix for iOS 15+ to get the root view controller
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let rootViewController = windowScene.windows.first?.rootViewController {
             bannerView.rootViewController = rootViewController
-            bannerView.load(Request())
+            bannerView.load(Request()) // Use Request
         } else {
             print("AdMobManager: Failed to get root view controller for banner ad")
         }
@@ -125,38 +167,17 @@ class AdMobManager: NSObject, ObservableObject {
     }
 }
 
-// UIViewControllerRepresentable for showing rewarded ads in SwiftUI
-struct RewardedAdController: UIViewControllerRepresentable {
-    let completion: (Bool) -> Void
-    
-    func makeUIViewController(context: UIViewControllerRepresentableContext<RewardedAdController>) -> UIViewController {
-        let viewController = UIViewController()
-        return viewController
-    }
-    
-    func updateUIViewController(_ uiViewController: UIViewController, context: UIViewControllerRepresentableContext<RewardedAdController>) {
-        // Only attempt to show the ad if we've successfully loaded one
-        if AdMobManager.shared.isRewardedAdReady {
-            print("Showing rewarded ad from controller")
-            AdMobManager.shared.showRewardedAd(from: uiViewController, completion: completion)
-        } else {
-            print("Rewarded ad not ready in controller, attempting to load")
-            // If ad is not ready, try loading it and dismiss after a short delay
-            AdMobManager.shared.loadRewardedAd()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                completion(false)
-            }
-        }
-    }
-}
+// MARK: - SwiftUI Wrappers (Banner Ad Only)
 
 // SwiftUI wrapper for BannerView
 struct BannerAdView: UIViewRepresentable {
+    // Use BannerView
     func makeUIView(context: Context) -> BannerView {
         return AdMobManager.shared.createBannerAdView()
     }
     
+    // Use BannerView
     func updateUIView(_ uiView: BannerView, context: Context) {
-        // No update needed
+        // No update needed generally for banner ads unless properties change
     }
 } 

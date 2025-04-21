@@ -28,6 +28,22 @@ class GameViewModel: ObservableObject {
     func updateServices(authService: AuthenticationService, gameManager: GameManager) {
         self.authService = authService
         self.gameManager = gameManager
+        
+        // Load user data if available
+        if let userId = authService.user?.id {
+            // Update game manager with user ID to load saved state
+            gameManager.loadUserData(userId)
+            
+            // Check if we need to show the no lives UI
+            if gameManager.lives <= 0 {
+                gameManager.isGameOver = true
+                
+                // Make sure life regeneration timer is set
+                if gameManager.lastLifeRegenTime == nil {
+                    gameManager.updateLastLifeRegenTime()
+                }
+            }
+        }
     }
     
     func loadUsers() {
@@ -216,8 +232,8 @@ struct GameView: View {
     @State private var showExitAlert = false
     @State private var animateBackground = false
     @StateObject private var viewModel: GameViewModel
-    @State private var showRewardedAd = false
     @State private var showNoLivesOverlay = false
+    @State private var refreshTimer: Timer? = nil
     
     init() {
         // Initialize with a temporary view model, will be updated in onAppear
@@ -260,11 +276,12 @@ struct GameView: View {
             }
             
             // No lives overlay
-            if gameManager.lives <= 0 {
+            if gameManager.lives <= 0 || gameManager.isGameOver {
                 NoLivesOverlayView(
                     timeUntilNextLife: gameManager.timeUntilNextLife(),
                     onWatchAd: {
-                        showRewardedAd = true
+                        // Directly call the AdMobManager to show the ad
+                        showRewardedAdFlow()
                     },
                     onExit: {
                         dismiss()
@@ -279,19 +296,11 @@ struct GameView: View {
             // Update the view model with the current services
             viewModel.updateServices(authService: authService, gameManager: gameManager)
             
-            // Check if we're out of lives
-            if gameManager.lives <= 0 {
-                gameManager.isGameOver = true
-                showNoLivesOverlay = true
-                
-                // Make sure we start the life regeneration timer if not already started
-                if gameManager.lastLifeRegenTime == nil {
-                    gameManager.updateLastLifeRegenTime()
-                }
-            }
-            
             // Load users from Firebase
             viewModel.loadUsers()
+            
+            // Setup a refresh timer to check life regeneration regularly
+            setupRefreshTimer()
             
             // Debug print to verify the questions have user profile images
             if !viewModel.targetUsers.isEmpty {
@@ -301,14 +310,53 @@ struct GameView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showRewardedAd) {
-            RewardedAdView { success in
-                if success {
-                    // Reset lives to max when ad is successfully watched
-                    gameManager.resetLives()
-                    showNoLivesOverlay = false
+        .onDisappear {
+            // Clean up timer when view disappears
+            refreshTimer?.invalidate()
+            refreshTimer = nil
+        }
+    }
+    
+    private func setupRefreshTimer() {
+        // Check every second for life regeneration
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            // Manually trigger life regeneration check
+            gameManager.checkLifeRegeneration()
+            
+            // If lives are restored, make sure game is restarted
+            if gameManager.lives > 0 && gameManager.isGameOver {
+                gameManager.isGameOver = false
+                viewModel.loadUsers()
+            }
+        }
+    }
+    
+    // Helper function to get the root view controller and show the ad
+    private func showRewardedAdFlow() {
+        // Find the root view controller
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+            print("GameView: Could not find root view controller to present ad.")
+            // Handle error appropriately - maybe show an alert to the user
+            return
+        }
+        
+        print("GameView: Attempting to show rewarded ad.")
+        // Call the AdMobManager to show the ad
+        AdMobManager.shared.showRewardedAd(from: rootViewController) { success in
+            if success {
+                print("GameView: Rewarded ad watched successfully.")
+                // Reset lives to max when ad is successfully watched
+                gameManager.resetLives()
+                
+                // If game was over, restart the game
+                if gameManager.isGameOver {
+                    gameManager.isGameOver = false
+                    viewModel.loadUsers() // Reload users to restart game flow
                 }
-                showRewardedAd = false
+            } else {
+                print("GameView: Rewarded ad failed or was not watched.")
+                // Handle failure - maybe show an alert
             }
         }
     }
@@ -812,75 +860,6 @@ struct NoLivesOverlayView: View {
             return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         } else {
             return String(format: "%02d:%02d", minutes, seconds)
-        }
-    }
-}
-
-// MARK: - Rewarded Ad View
-struct RewardedAdView: View {
-    let completion: (Bool) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var loadingMessage = "Loading Ad..."
-    @State private var timeoutTimer: Timer? = nil
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.9)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                Text(loadingMessage)
-                    .font(AppTheme.title())
-                    .foregroundColor(AppTheme.textPrimary)
-                
-                ProgressView()
-                    .scaleEffect(1.5)
-                    .tint(AppTheme.primary)
-                
-                Text("Please wait while we load the ad")
-                    .font(AppTheme.body())
-                    .foregroundColor(AppTheme.textSecondary)
-            }
-        }
-        .onAppear {
-            // Set a timeout timer in case the ad doesn't load
-            timeoutTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { _ in
-                loadingMessage = "Ad not available"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    completion(false)
-                    dismiss()
-                }
-            }
-            
-            // Force a new ad to load if not already ready
-            if !AdMobManager.shared.isRewardedAdReady {
-                AdMobManager.shared.loadRewardedAd()
-            }
-            
-            // Get the root view controller after a short delay to allow ad to load
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let rootViewController = windowScene.windows.first?.rootViewController {
-                    
-                    // Show the rewarded ad
-                    AdMobManager.shared.showRewardedAd(from: rootViewController) { success in
-                        // Cancel the timeout timer
-                        timeoutTimer?.invalidate()
-                        
-                        // Proceed with completion
-                        completion(success)
-                        dismiss()
-                    }
-                } else {
-                    // Fallback if we can't get the root view controller
-                    timeoutTimer?.invalidate()
-                    completion(false)
-                    dismiss()
-                }
-            }
-        }
-        .onDisappear {
-            timeoutTimer?.invalidate()
         }
     }
 }

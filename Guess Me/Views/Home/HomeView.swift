@@ -49,12 +49,6 @@ struct HomeView: View {
                         // Add some bottom padding to ensure content doesn't get hidden behind the banner
                         Color.clear.frame(height: 60)
                     }
-                    
-                    // Banner ad at the bottom
-                    BannerAdView()
-                        .frame(height: 50)
-                        .background(AppTheme.cardBackground)
-                        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: -2)
                 }
                 .navigationTitle("Home")
                 .navigationBarTitleDisplayMode(.large)
@@ -103,7 +97,9 @@ struct HomeView: View {
                     // Pre-load the ad if not already loaded
                     if !AdMobManager.shared.isRewardedAdReady {
                         print("Ad not ready, loading now")
-                        AdMobManager.shared.loadRewardedAd()
+                        Task {
+                            await AdMobManager.shared.loadRewardedAd()
+                        }
                     } else {
                         print("Ad already loaded and ready")
                     }
@@ -215,25 +211,6 @@ struct HomeView: View {
                     iconName: "number.circle.fill",
                     color: AppTheme.primary
                 )
-                
-                if let correctGuesses = authService.user?.correctGuesses, 
-                   let totalGuesses = authService.user?.totalGuesses,
-                   totalGuesses > 0 {
-                    let accuracy = Double(correctGuesses) / Double(totalGuesses) * 100
-                    StatItemView(
-                        title: "Accuracy",
-                        value: String(format: "%.1f%%", accuracy),
-                        iconName: "percent",
-                        color: AppTheme.tertiary
-                    )
-                } else {
-                    StatItemView(
-                        title: "Accuracy",
-                        value: "0%",
-                        iconName: "percent",
-                        color: AppTheme.tertiary
-                    )
-                }
             }
         }
         .padding(20)
